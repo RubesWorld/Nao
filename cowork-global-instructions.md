@@ -17,6 +17,22 @@ On every session start:
 - When referencing a #fact or #preference and Ruben doesn't correct it, update its "Last confirmed" date
 - When Ruben shares a business or fun idea, capture it as an #idea node with Status = Raw. If he wants to explore it, research feasibility and fill in the fields.
 
+## Browser control — three tools, pick by use case
+
+Three different surfaces give Nao browser/computer control. Match the tool to the task:
+
+- **Claude in Chrome** (extension): user is on a webpage, wants help with it. Real-time, interactive.
+- **Playwright MCP** (mcp__playwright__*): autonomous web tasks — scheduled jobs, scraping, form filling. Headless.
+- **Computer Use**: multi-app workflows involving non-browser GUIs. Request permission before acting.
+
+Decision rule:
+1. If a purpose-built MCP exists (Gmail, Slack, Tana, Monarch), USE THAT — don't drop into a browser.
+2. User browsing in real time → Claude in Chrome.
+3. Scheduled / autonomous web work → Playwright MCP.
+4. Non-browser app or cross-app workflow with no MCP → Computer Use.
+
+Caveat: avoid sensitive data or banking with Computer Use (early-stage). Use Playwright MCP with .env secrets for that instead.
+
 ## Memory protocol — propose before saving
 
 When you notice something worth remembering long-term — a working preference, personality trait, behavioral pattern, recurring issue, lesson learned — DO NOT save silently. Use this protocol:
