@@ -70,19 +70,6 @@ If a category has zero items, omit that line. If everything is empty, write a si
 
 For the Slack and Telegram outputs (next steps), feel free to be concise and surface highlights. But the Tana digest itself must be complete — it's the persistent record.
 
-# Step 5: Slack DM summary
-
-Use `slack_search_users` to find Ruben's user ID, then `slack_send_message`:
-
-```
-🌙 End of day — <today's date>
-✅ <count> tasks done / <count> promises closed
-📝 <count> captures (<X> facts, <Y> ideas, <Z> resources)
-🧵 <count> open threads to revisit
-```
-
-Skip empty bullets. If everything is zero, send: "🌙 End of day — <date>: quiet day, nothing logged."
-
 # Step 6: Telegram push (stdout)
 
 Print 2-4 short readable lines. Lead with what was accomplished (positive frame), then unresolved. Examples:

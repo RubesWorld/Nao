@@ -67,20 +67,6 @@ Body sections (omit empty ones, list each person with full context block):
 
 Keep tight — under 60 lines total. List specific names. No "you should reach out more" lectures.
 
-# Step 7: Slack DM
-
-`slack_send_message`:
-
-```
-👥 Relationship review — <date>
-🔴 Concerning: <name> (last interaction: <vibe>)
-⏰ Overdue: <count> people (top: <names>)
-🎂 This week: <Name> birthday <date>
-👋 Reach out today: <pick the single highest-priority person>
-```
-
-Skip empty lines. If everything's clean: "👥 Relationship review — <date>: all relationships in good shape."
-
 # Step 8: Telegram (stdout)
 
 Print 3-5 lines. Lead with concerning, then today's reach-out. Examples:

@@ -49,21 +49,6 @@ Body sections (omit empty ones):
 
 Keep under 50 lines. Be specific. No filler.
 
-# Step 5: Slack DM
-
-`slack_search_users("Ruben")` then `slack_send_message`:
-
-```
-🗓️ Weekly review — <date>
-⚠️ <N> overdue promises (top: <name>)
-💤 <N> dormant projects: <names>
-🧠 <N> stale memory items to confirm
-💡 <N> ideas still raw
-👉 This week: <one-sentence recommendation>
-```
-
-Skip lines with zero count. If literally everything is clean, send: "🗓️ Weekly review — <date>: clean week, nothing rotting."
-
 # Step 6: Telegram (stdout)
 
 Print 3-5 lines. Lead with most actionable. Examples:

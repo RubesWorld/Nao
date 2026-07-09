@@ -52,23 +52,6 @@ Body of the briefing (as children under the digest node):
 
 Keep the whole briefing under 30 lines. If a section is empty, omit it entirely. Do not invent data — if something isn't in Tana, don't include it.
 
-# Step 4: Send Slack DM summary
-
-After the Tana write succeeds, send a short summary to Ruben's Slack DMs (himself):
-- Use the Slack MCP `slack_search_users` to find Ruben's user ID (search "Ruben Ramirez" or "ruben"). Cache it for the message.
-- Use `slack_send_message` with channel set to Ruben's user ID (this DMs him).
-- Format the message as a compact briefing — header line + bullets:
-
-```
-🧠 Morning briefing — <today's date>
-• <Y> promises due this week (<Z> overdue)
-• <N> stale projects: <names>
-• Reach out: <person name + reason>
-• Inbox: <count> items in today's daily note
-```
-
-Keep under 8 lines total. Skip bullets that have nothing to report. If everything is empty, just send "🧠 Morning briefing — <date>: nothing on the radar today."
-
 # Step 5: Final output to stdout (Telegram push)
 
 After writing to Tana and Slack, print a short readable summary to stdout. The runner sends this verbatim to Telegram, which means it should answer "what do I need to know in 5 seconds?" — readable on a watch.

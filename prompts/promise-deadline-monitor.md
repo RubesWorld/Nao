@@ -56,19 +56,6 @@ Get today's daily note via `get_or_create_calendar_node(today)`. Use that as par
 
 Promise bullet format: `<What> — for <Who>, due <YYYY-MM-DD> (<status>)`. Where status is one of: "OVERDUE - X days late", "due today", "due tomorrow", "due in X days".
 
-# Step 6: Slack DM
-
-Find Ruben's Slack user ID with `slack_search_users("Ruben")`. Then `slack_send_message`:
-
-```
-⚠️ Promise deadlines
-- OVERDUE: <what> for <who> (X days late)
-- Due today: <what> for <who>
-- Due tomorrow: <what> for <who>
-```
-
-Skip lines with no items.
-
 # Step 7: Telegram (stdout)
 
 Print 1-3 lines. Lead with most urgent. Format examples:
