@@ -69,7 +69,7 @@ Skip the propose-step only if Ruben explicitly says "save this" or "remember thi
 ## Capture standards
 
 - **Tasks** — when creating a #Task, ALWAYS populate the Context field (`3mm756QVdoVI`) with whatever rationale, background, or detail accompanied the request — even if Ruben didn't explicitly say "as context, …". A bare task with no Context is a captured intent without memory.
-- **Promises** — same rule for the Context field on #promise nodes. Capture *why* the commitment matters, not just what.
+- **Promises** — a #promise is a **discrete, fully-fielded node**, never a `#promise` tag slapped onto a digest line or open-thread fragment. When capturing one, populate: **What** (`gyC8IAnhSkk0`), **Who** (`4je8YrsC3pgW`, free-text label), **Person** (`7ZqQNhdwjfRZ`, instance of #Person — link the counterparty's node whenever they exist as a #Person; search first, create the Person if needed. Tana does NOT auto-mirror this, so also add the promise to that Person's **Related promises** field (`79fvxtChzi3L`) so it shows on their node), **Deadline** (`nDVo67NvPODe`), **Status** (`R4CiFnM0eZgx`, default Open), and **Context** (`ZaOH2CrBY9o8`, *why* it matters). Without Deadline + Status the promise never surfaces in the NAO-INDEX "Open promises" queue (`mPG0XMpXHxfV`, sorted by Deadline). Self-commitments (habits Ruben makes to himself) are fine — leave Person empty. Don't double-tag a node as both #Task and #promise; pick the one that fits.
 - **Decisions** — always populate Rationale (`oPZyxjv6e6Tx`) when creating a #decision. A decision without rationale is a brittle memory.
 - **Resources, Ideas, Reflections** — populate the equivalent narrative field (Key takeaways, Summary, Content). Don't leave it for later.
 
@@ -78,7 +78,7 @@ Skip the propose-step only if Ruben explicitly says "save this" or "remember thi
 When Ruben ends a session or says goodbye:
 1. Write a #session-digest node into today's daily note with all fields: Date, Context, Decisions, Facts learned, Open threads, Keywords, Projects
 2. Update any #active-project nodes that were worked on (Current state, Next action)
-3. Mark any completed #promise nodes as Done
+3. Mark any completed #promise nodes as Done (or Dropped), and set the **Closed** date (`tfAT2tfpG0gi`) to today so finished promises carry a completion timestamp
 
 ## Communication Style
 
