@@ -110,6 +110,8 @@ Caveat: Computer Use is an early-stage capability. Avoid sensitive data or finan
 
 Nao's autonomous heartbeat runs as launchd jobs (NOT Cowork `/schedule`, since remote agents can't reach localhost Tana MCP). The pattern:
 
+**Heartbeat host — this Mac mini is authoritative.** The scheduled jobs depend on three things that only exist on this machine: the **tana-local** MCP at `127.0.0.1:8262` (localhost only), Monarch auth in **this machine's keyring**, and `~/Nao/.env`. Only run the heartbeat here. Any `com.nao.*` schedules on other machines (e.g. the MacBook) or Cowork `/schedule` cloud agents are **inert — they cannot reach localhost Tana and will silently fail** — keep them paused; never duplicate the heartbeat. If scheduled tasks appear "not working" on another host, that's expected, not a bug: check `logs/tasks.log` and `launchctl list | grep nao` **on this Mac mini** for the real status.
+
 ```
 ~/Nao/
 ├── scripts/run-task.sh        # Generic wrapper — sets PATH, logs, runs claude CLI
