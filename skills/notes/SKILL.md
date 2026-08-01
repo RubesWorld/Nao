@@ -1,6 +1,6 @@
 ---
 name: notes
-description: File a batch of notes about a specific project, person, event, or trip into Tana under the right parent node. Handles photos of handwritten pages and typed brain dumps. Use when the user says /notes, "add these notes to <thing>", "here are my notes on <project>", drops a photo of a notebook page, or pastes a messy blob tied to something specific.
+description: File a batch of notes about a specific project, person, event, or trip into Tana under the right parent node. Handles photos of handwritten pages and typed brain dumps. Use when the user says /notes, asks to add notes to a named project or person, says "here are my notes on" something, drops a photo of a notebook page, or pastes a messy blob tied to something specific.
 ---
 
 # Notes to Tana
