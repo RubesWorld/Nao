@@ -19,6 +19,7 @@ SECURITY — read before changing anything here.
 """
 
 import json
+import re
 import os
 import subprocess
 import sys
@@ -32,6 +33,9 @@ STATE_DIR = os.path.join(NAO, "state")
 OFFSET_PATH = os.path.join(STATE_DIR, "telegram-offset.json")
 WATCHER_STATE = os.path.join(STATE_DIR, "watcher.json")
 LAST_BATCH = os.path.join(STATE_DIR, "watcher-lastbatch.json")
+PENDING = os.path.join(STATE_DIR, "cleanup-pending.json")
+PROPOSE_PROMPT = os.path.join(NAO, "prompts", "cleanup-propose.md")
+EXECUTE_PROMPT = os.path.join(NAO, "prompts", "cleanup-execute.md")
 LOCK_PATH = os.path.join(STATE_DIR, "telegram-bridge.lock")
 AUDIT_LOG = os.path.join(NAO, "logs", "telegram-bridge.log")
 
@@ -109,6 +113,77 @@ def write_json(path, obj):
 # alert should be instant, free, and impossible to misinterpret.
 # --------------------------------------------------------------------------
 
+def propose_cleanup(scope):
+    """Read-only scan. Writes the numbered list Python owns, not the model."""
+    with open(PROPOSE_PROMPT) as f:
+        prompt = f.read()
+    prompt += "\n\n# Scope for this run\n\n%s\n" % (scope or "all")
+
+    out = run_claude(prompt, model="sonnet")
+    match = re.search(r"\[.*\]", out, re.DOTALL)
+    if not match:
+        return "Couldn't read a proposal list. Nothing changed.\n\n%s" % out[:500]
+    try:
+        items = json.loads(match.group(0))
+    except ValueError as e:
+        return "Proposal wasn't valid JSON (%s). Nothing changed." % e
+
+    if not items:
+        write_json(PENDING, {"items": [], "at": datetime.now(timezone.utc).isoformat()})
+        return "Nothing to clean up in that scope."
+
+    items = items[:12]
+    write_json(PENDING, {"items": items,
+                         "at": datetime.now(timezone.utc).isoformat()})
+
+    verb = {"trash": "trash", "mark_outdated": "mark outdated", "mark_done": "mark done"}
+    lines = ["Proposed (nothing changed yet):"]
+    for i, it in enumerate(items, 1):
+        lines.append("%d. %s — %s" % (i, it.get("title", "?"),
+                                      verb.get(it.get("action"), it.get("action"))))
+        if it.get("reason"):
+            lines.append("     %s" % it["reason"])
+    lines.append("")
+    lines.append("reply:  do 1,3   /   do all   /   no")
+    return "\n".join(lines)
+
+
+def execute_cleanup(selection):
+    pending = read_json(PENDING, {}).get("items") or []
+    if not pending:
+        return "No pending proposal. Send `cleanup` first."
+
+    if selection.strip() in ("all", "*"):
+        chosen = list(range(len(pending)))
+    else:
+        chosen = []
+        for part in re.split(r"[,\s]+", selection.strip()):
+            if not part:
+                continue
+            if not part.isdigit():
+                return "Couldn't read %r. Try `do 1,3` or `do all`." % part
+            idx = int(part) - 1
+            if not 0 <= idx < len(pending):
+                return "No item %s — the list has %d." % (part, len(pending))
+            chosen.append(idx)
+    if not chosen:
+        return "Nothing selected."
+
+    picked = [pending[i] for i in sorted(set(chosen))]
+    with open(EXECUTE_PROMPT) as f:
+        prompt = f.read()
+    prompt += "\n\n```json\n%s\n```\n" % json.dumps(picked, indent=2)
+
+    audit("CLEANUP EXECUTE %d item(s): %s"
+          % (len(picked), ", ".join(p.get("id", "?") for p in picked)))
+    result = run_claude(prompt, model="sonnet")
+
+    # Consume the proposal either way — stale numbering is how the wrong
+    # thing gets deleted on a second `do`.
+    write_json(PENDING, {"items": [], "at": datetime.now(timezone.utc).isoformat()})
+    return result or "(no output)"
+
+
 def builtin(text):
     cmd = text.strip().lower()
 
@@ -118,7 +193,23 @@ def builtin(text):
                 "  done       — clear it (mark handled)\n"
                 "  drop       — clear it and stop tracking\n"
                 "  status     — what the watcher is tracking\n"
+                "  cleanup [facts|promises|schema|all]\n"
+                "             — propose tidy-ups, changes nothing\n"
+                "  do 1,3 / do all / no\n"
+                "             — act on the last proposal\n"
                 "anything else is passed to Nao")
+
+    if cmd == "cleanup" or cmd.startswith("cleanup "):
+        return propose_cleanup(cmd[len("cleanup"):].strip())
+
+    if cmd == "do" or cmd.startswith("do "):
+        return execute_cleanup(cmd[len("do"):].strip())
+
+    if cmd in ("no", "cancel", "nevermind", "never mind"):
+        if read_json(PENDING, {}).get("items"):
+            write_json(PENDING, {"items": []})
+            return "Discarded. Nothing changed."
+        return None   # not answering a proposal — let Claude handle it
 
     if cmd == "status":
         state = read_json(WATCHER_STATE, {})
@@ -173,12 +264,12 @@ def builtin(text):
     return None
 
 
-def run_claude(text):
+def run_claude(text, model=None):
     env = dict(os.environ)
     env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
     try:
         proc = subprocess.run(
-            ["claude", "-p", "--model", MODEL, "--output-format", "text",
+            ["claude", "-p", "--model", model or MODEL, "--output-format", "text",
              "--dangerously-skip-permissions"],
             input=text, capture_output=True, text=True,
             cwd=NAO, env=env, timeout=CLAUDE_TIMEOUT,
@@ -267,6 +358,12 @@ def main():
                 continue
 
             audit("CMD %r" % text[:300])
+
+            # Most builtins are instant, but cleanup/do call Claude and can
+            # take a minute. A silent gap reads as broken, so ack those too.
+            lowered = text.strip().lower()
+            if lowered.startswith(("cleanup", "do ")) or lowered == "do":
+                send(token, chat_id, "on it…")
 
             reply = builtin(text)
             if reply is not None:
