@@ -81,17 +81,52 @@ def api(token, method, params=None, timeout=40):
         return json.load(r)
 
 
-def send(token, chat_id, text):
+def keyboard(rows):
+    """Inline keyboard. rows = [[(label, callback_data), ...], ...]
+
+    callback_data is capped at 64 bytes by Telegram, so keep it terse —
+    it maps to a text command below rather than carrying state itself.
+    """
+    return json.dumps({"inline_keyboard": [
+        [{"text": label, "callback_data": data} for label, data in row]
+        for row in rows
+    ]})
+
+
+def send(token, chat_id, text, markup=None):
     """Split rather than truncate — a cut-off answer is worse than two messages."""
     if not text.strip():
         text = "(no output)"
-    for i in range(0, len(text), TELEGRAM_LIMIT):
+    chunks = [text[i:i + TELEGRAM_LIMIT] for i in range(0, len(text), TELEGRAM_LIMIT)]
+    for n, chunk in enumerate(chunks):
+        params = {"chat_id": chat_id, "text": chunk}
+        # Buttons ride on the LAST chunk so they sit at the bottom.
+        if markup and n == len(chunks) - 1:
+            params["reply_markup"] = markup
         try:
-            api(token, "sendMessage",
-                {"chat_id": chat_id, "text": text[i:i + TELEGRAM_LIMIT]})
+            api(token, "sendMessage", params)
         except Exception as e:
             audit("send failed: %s" % e)
             return
+
+
+# A tap resolves to the same string a typed command would produce, so there
+# is exactly one implementation of every action.
+def callback_to_command(data):
+    if data == "w:snooze":
+        return "snooze 7d"
+    if data == "w:done":
+        return "done"
+    if data == "w:drop":
+        return "drop"
+    if data == "c:all":
+        return "do all"
+    if data == "c:no":
+        return "no"
+    if data.startswith("c:"):
+        n = data[2:]
+        return "do %s" % n if n.isdigit() else None
+    return None
 
 
 def read_json(path, default):
@@ -146,8 +181,14 @@ def propose_cleanup(scope):
         if it.get("reason"):
             lines.append("     %s" % it["reason"])
     lines.append("")
-    lines.append("reply:  do 1,3   /   do all   /   no")
-    return "\n".join(lines)
+    lines.append("or type `do 1,3` to pick specific ones")
+
+    # Deliberately only bulk actions as buttons. Per-item buttons would need
+    # stable numbering across partial applies AND a keyboard that survives a
+    # tap — editMessageText strips it. Typing `do 1,3` handles the rarer
+    # granular case without that complexity.
+    return "\n".join(lines), keyboard([[("Apply all", "c:all"),
+                                        ("Cancel", "c:no")]])
 
 
 def execute_cleanup(selection):
@@ -250,18 +291,46 @@ def builtin(text):
 
     if cmd in ("done", "drop", "/done", "/drop"):
         if not keys:
-            return "Nothing recent to clear."
+            return ("Nothing recent to clear — no alert has been sent yet, "
+                    "or it was already handled.")
+
+        batch = read_json(LAST_BATCH, {})
+        at = batch.get("at")
+        if at:
+            try:
+                age = datetime.now(timezone.utc) - datetime.fromisoformat(at)
+                if age > timedelta(days=2):
+                    return ("The last alert was %d days ago — too old to act on "
+                            "blind. Send `status` to see what's tracked."
+                            % age.days)
+            except ValueError:
+                pass
+
         state = read_json(WATCHER_STATE, {})
-        n = 0
-        for k in keys:
-            if state.pop(k, None) is not None:
-                n += 1
+        cleared = [state.pop(k) for k in keys if k in state]
         write_json(WATCHER_STATE, state)
-        # 'done' only clears the watcher's memory. The promise itself still
-        # says Open in Tana — say so rather than implying otherwise.
-        note = ("\nNote: this clears the reminder, not the Tana node. "
-                "Ask me to mark it Done if you want that too.")
-        return "Cleared %d item(s).%s" % (n, note if cmd.endswith("done") else "")
+        if not cleared:
+            return "Already cleared."
+
+        if cmd.endswith("drop"):
+            # Drop = "not doing this". Stop nagging, leave Tana untouched.
+            return ("Dropped %d item(s) — I'll stop tracking them.\n"
+                    "Tana is unchanged; they still read Open there."
+                    % len(cleared))
+
+        # Done = "I did it". Close the loop properly rather than just
+        # forgetting, which is the whole point of Status + Closed existing.
+        node_ids = [k.split(":", 1)[1] for k in keys if ":" in k]
+        instruction = (
+            "Mark these #promise nodes complete in Tana workspace drg2JUfK3f-A.\n"
+            "For EACH node id below: set Status (R4CiFnM0eZgx) to Done, and set "
+            "Closed (tfAT2tfpG0gi) to today's date in YYYY-MM-DD (get it with "
+            "`date +%Y-%m-%d`).\n"
+            "Touch nothing else. Reply with one short line per node, nothing more.\n\n"
+            + "\n".join("- %s" % n for n in node_ids))
+        audit("DONE -> closing promises in Tana: %s" % ", ".join(node_ids))
+        result = run_claude(instruction, model="sonnet")
+        return "Cleared %d item(s) and closed in Tana:\n%s" % (len(cleared), result)
 
     return None
 
@@ -360,6 +429,47 @@ def main():
             # losing is the safer failure.
             write_json(OFFSET_PATH, {"offset": offset})
 
+            # ---- button taps ------------------------------------------
+            cq = update.get("callback_query")
+            if cq:
+                cq_msg = cq.get("message") or {}
+                chat_id = str(cq_msg.get("chat", {}).get("id", ""))
+                if chat_id != allowed:
+                    audit("REJECTED callback chat_id=%s" % chat_id)
+                    continue
+                data = cq.get("data") or ""
+                cmd = callback_to_command(data)
+                audit("TAP %r -> %r" % (data, cmd))
+
+                # Always answer, or the button spins forever on his phone.
+                try:
+                    api(token, "answerCallbackQuery",
+                        {"callback_query_id": cq["id"],
+                         "text": "working…" if cmd else "unknown button"})
+                except Exception as e:
+                    audit("answerCallbackQuery failed: %s" % e)
+                if not cmd:
+                    continue
+
+                result = builtin(cmd)
+                if isinstance(result, tuple):
+                    result = result[0]
+                result = result or "(nothing to do)"
+
+                # Strip the buttons so the same tap can't be replayed, and
+                # record the outcome on the original message.
+                try:
+                    api(token, "editMessageText", {
+                        "chat_id": chat_id,
+                        "message_id": cq_msg.get("message_id"),
+                        "text": ((cq_msg.get("text") or "")[:3500]
+                                 + "\n\n— " + result[:500]),
+                    })
+                except Exception as e:
+                    audit("editMessageText failed: %s" % e)
+                    send(token, chat_id, result)
+                continue
+
             msg = update.get("message") or update.get("edited_message")
             if not msg:
                 continue
@@ -389,7 +499,11 @@ def main():
 
             reply = builtin(text)
             if reply is not None:
-                send(token, chat_id, reply)
+                # builtins may return plain text or (text, inline keyboard)
+                if isinstance(reply, tuple):
+                    send(token, chat_id, reply[0], markup=reply[1])
+                else:
+                    send(token, chat_id, reply)
                 continue
 
             # A silent multi-minute gap reads as broken.

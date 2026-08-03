@@ -161,13 +161,21 @@ def describe(item, times_notified):
     return head
 
 
-def send_telegram(text):
+def send_telegram(text, with_actions=False):
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     if not (token and chat_id):
         log("no telegram creds — printing only")
         return False
-    data = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
+    params = {"chat_id": chat_id, "text": text}
+    if with_actions:
+        # The bridge maps these to the same commands typing them would produce.
+        params["reply_markup"] = json.dumps({"inline_keyboard": [[
+            {"text": "Snooze 7d", "callback_data": "w:snooze"},
+            {"text": "Done", "callback_data": "w:done"},
+            {"text": "Drop", "callback_data": "w:drop"},
+        ]]})
+    data = urllib.parse.urlencode(params).encode()
     req = urllib.request.Request(
         "https://api.telegram.org/bot%s/sendMessage" % token, data=data)
     try:
@@ -264,7 +272,9 @@ def main():
 
     message = "\n".join(lines)
     print(message)
-    send_telegram(message)
+    # Only offer buttons when there is something they could act on — a
+    # message that is purely "Cleared: x" has nothing to snooze.
+    send_telegram(message, with_actions=bool(sent_keys))
     log("notified %d item(s)" % len(due[:MAX_ITEMS_PER_MESSAGE]))
     return 0
 
