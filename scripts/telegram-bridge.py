@@ -24,6 +24,7 @@ import os
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -43,6 +44,7 @@ POLL_TIMEOUT = 30
 CLAUDE_TIMEOUT = 600
 TELEGRAM_LIMIT = 4096
 RATE_LIMIT_PER_HOUR = 30
+MAX_CONSECUTIVE_ERRORS = 20   # then exit and let launchd restart us
 MODEL = os.environ.get("NAO_BRIDGE_MODEL", "sonnet")
 
 _recent = []   # command timestamps, for rate limiting
@@ -320,15 +322,35 @@ def main():
     offset = read_json(OFFSET_PATH, {}).get("offset", 0)
     audit("bridge started (model=%s, allowed_chat=%s, offset=%d)"
           % (MODEL, allowed, offset))
+    consecutive_errors = 0
 
     while True:
         try:
             resp = api(token, "getUpdates",
                        {"offset": offset, "timeout": POLL_TIMEOUT},
                        timeout=POLL_TIMEOUT + 15)
-        except Exception as e:
+            consecutive_errors = 0
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                # Not transient — the token was revoked or rotated. Exiting
+                # lets launchd KeepAlive restart us, which re-reads .env and
+                # picks up the new token. Retrying in-process would spin
+                # forever on a stale credential, which is exactly what it did.
+                audit("FATAL: auth rejected (HTTP %d) — exiting so launchd "
+                      "restarts with fresh .env" % e.code)
+                return 1
+            consecutive_errors += 1
             audit("poll error: %s" % e)
-            time.sleep(5)
+        except Exception as e:
+            consecutive_errors += 1
+            audit("poll error: %s" % e)
+
+        if consecutive_errors:
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                audit("FATAL: %d consecutive poll failures — exiting for restart"
+                      % consecutive_errors)
+                return 1
+            time.sleep(min(5 * consecutive_errors, 60))   # back off, don't hammer
             continue
 
         for update in resp.get("result", []):
