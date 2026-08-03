@@ -129,8 +129,44 @@ Nao's autonomous heartbeat runs as launchd jobs (NOT Cowork `/schedule`, since r
 - Prompts should **skip empty sections** — no "no items" filler text. Quiet by default.
 - Final stdout is one line confirming what was written and where (node ID + count)
 
-**Active tasks:**
-- `morning-briefing` — 8:00 AM daily (`com.nao.morning-briefing.plist`)
+**Active tasks:** `morning-briefing`, `end-of-day-digest`, `weekly-review`,
+`relationship-review`, `mid-week-budget-check`, `payday-allocation-check`,
+`weekly-spending-digest`, `monthly-financial-closeout` — all `claude -p` prompt
+jobs via `run-task.sh`. Retired plists live in `launchd-archive/` rather than
+being deleted (`listing-monitor`, move complete; `promise-deadline-monitor`,
+superseded by the watcher).
+
+## The ambient layer — watcher + bridge
+
+Two components that are NOT prompt jobs. Both are Python, both are stateful,
+and neither goes through `run-task.sh`.
+
+**`com.nao.watcher`** — hourly, `scripts/watcher.py`. Silent unless a condition
+trips. This is the difference from every prompt job: it keeps state in
+`state/watcher.json`, so it escalates instead of repeating. Ladder is
+1st plain → 2nd "still open" → 3rd offers an out → 4th auto-snoozes 7 days;
+never twice in one day. When a tracked item resolves it says so once, then
+forgets. Retrieval runs through `claude -p` (needs MCP for Tana) via
+`prompts/watcher-collect.md`, which returns JSON only — **all state and
+escalation logic is deterministic Python, deliberately no LLM in that path.**
+Currently watches promise deadlines. Add conditions one at a time; the failure
+mode of this whole idea is notification fatigue, and it arrives by accumulation.
+
+**`com.nao.telegram-bridge`** — persistent daemon, `scripts/telegram-bridge.py`.
+Inbound commands via `getUpdates` long polling, so no public URL or tunnel and
+nothing is exposed. `snooze 7d` / `done` / `drop` / `status` are handled
+directly against the watcher state; anything else is passed to `claude -p`.
+
+**Security — do not weaken.** The bridge executes text arriving from the
+internet on a machine holding Tana, Monarch auth, `.env`, and SSH keys. The
+`TELEGRAM_CHAT_ID` allowlist is the entire boundary: a bot token is a bearer
+credential, so anyone holding it can message the bot. Non-allowlisted senders
+are logged and get **no reply** — a reply confirms the bot is live. Every
+command is audited to `logs/telegram-bridge.log`, rate limited to 30/hr, and
+the update offset is persisted *before* execution so a crash loses a command
+rather than replaying it.
+
+To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge}.plist`
 
 **To add a new scheduled task:**
 1. Write `~/Nao/prompts/<name>.md` following the morning-briefing pattern

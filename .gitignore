@@ -2,3 +2,5 @@ logs/
 briefings/
 .claude/
 .env
+state/
+logs/
