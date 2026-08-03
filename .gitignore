@@ -3,4 +3,6 @@ briefings/
 .claude/
 .env
 state/
-logs/
+.DS_Store
+external/
+.playwright-mcp/
