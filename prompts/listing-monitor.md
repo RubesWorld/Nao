@@ -12,15 +12,10 @@ Search Tana for an existing listing-digest from the last 24 hours:
 
 # Step 2: Pull listing alert emails
 
-**Prefer Superhuman MCP** (`mcp__claude_ai_Superhuman_Mail__*`) since it indexes BOTH Ruben's personal (nycrar@gmail.com) and work (ruben@armakuni.com) inboxes in a single connection. The StreetEasy alerts go to the personal inbox.
+**Use Gmail MCP** (`mcp__claude_ai_Gmail__search_threads`) as primary — verified 2026-07-10 that it's authenticated to Ruben's personal inbox (nycrar@gmail.com), which is where StreetEasy alerts land. Superhuman MCP was tested the same day and only reaches ruben@armakuni.com (work) — it returns zero results for listing searches, so don't rely on it or gate on its availability. If Gmail MCP is ever unavailable, try Superhuman as a fallback and note in output that the primary path failed.
 
-Search for listing-site emails in the last 48 hours. Try these MCP paths in order:
-
-1. **Superhuman MCP first** — use its search/list tool with query equivalent to:
-   `from:(streeteasy.com OR zillow.com OR apartments.com OR zumper.com OR renthop.com OR compass.com) newer_than:2d`
-   Specifically check Ruben's personal account (nycrar@gmail.com) since work alerts wouldn't have listing emails.
-
-2. **Gmail MCP fallback** (`mcp__claude_ai_Gmail__search_threads`) — only use if Superhuman is unavailable. Same query syntax. Note that Gmail MCP is currently authenticated to work email only, so it likely returns nothing for listing alerts.
+Query syntax (avoid `newer_than:Nd` combined with an `OR` sender group — it silently returns empty; use `after:YYYY/MM/DD` instead):
+`from:(streeteasy.com OR zillow.com OR apartments.com OR zumper.com OR renthop.com OR compass.com) after:<48h-ago date>`
 
 For each matching email/thread, fetch the full body content.
 
