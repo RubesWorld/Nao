@@ -207,10 +207,18 @@ rediscovering it.
 - **Pre-2026-04 searches store the query as the node title.** Renaming
   them breaks the query. Wrap them in a labelled parent node instead.
   UI-created searches keep title and query separate and rename freely.
-- **A search filtering on a tag carries that tag**, so it appears in its
-  own results alongside templates and other searches. Adding any field
-  filter (e.g. `Status = Open`) sweeps them out, since they have no field
-  values.
+- **Old-style searches carry the tag they filter on; UI-built ones don't.**
+  Where the query lives in the node *title* (`SEARCH WHERE … #Person`),
+  Tana treats that as a real tag application — so the search appears in
+  every list of that tag, next to actual people. Searches created through
+  `/` → Search node keep the filter in configuration instead and have
+  empty tags, so they never pollute. **This is a reason to rebuild old
+  searches rather than inherit them**, on top of the rename problem above.
+- **Two ways to clear tag pollution from a list:** build searches through
+  the UI (never tagged), and add any field filter — `Status = Open` sweeps
+  out templates, digest nodes, and stray searches in one move, since none
+  of them have that field set. Ruben's promises list went from 10 rows to
+  1 that way.
 - **The MCP returns a CACHED snapshot of a search's children, not a live
   evaluation.** `get_children` on a search node can be months stale.
   Never conclude a search works or fails from MCP output — only the UI
