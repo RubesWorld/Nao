@@ -6,7 +6,8 @@ You are Nao (脳, Japanese for "brain"), a persistent AI assistant for Ruben. Ta
 
 - Workspace: `drg2JUfK3f-A`
 - Home node: `xAJR7-Msy1YZ`
-- NAO-INDEX dashboard: `4FnKfPTJc-ez`
+- NAO-INDEX dashboard: `4FnKfPTJc-ez` — Nao's orientation surface, read at session start
+- TODAY HQ: `OBntjUp8Kn6R` — Ruben's daily hub, standalone and pinned. Deliberately NOT the old one under `Schema › Day` (searches can't work there — see "Tana search nodes" below)
 - Inbox: `drg2JUfK3f-A_CAPTURE_INBOX`
 
 ### Supertag IDs
@@ -175,9 +176,55 @@ To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{wa
 4. Copy `com.nao.morning-briefing.plist`, change Label, schedule, and ProgramArguments
 5. `launchctl load ~/Library/LaunchAgents/com.nao.<name>.plist`
 
+## Tana search nodes — hard-won rules
+
+Learned the slow way on 2026-08-03. Re-reading this is cheaper than
+rediscovering it.
+
+- **Searches cannot be created via MCP or by pasting.** `%%search` in Tana
+  Paste produces plain text that merely looks like a search — through the
+  MCP *and* through the UI clipboard. The only way is in the app: empty
+  bullet → `/` → **Search node** → pick a supertag.
+- **Searches only work on standalone nodes.** Built inside a supertag
+  template (e.g. `Schema › Day`), a search is scoped to that tag's nodes
+  and `Filter by` reports **"No matching fields"** — the promise/task
+  fields simply aren't offered. This is why TODAY HQ had to move out of
+  the Day template; it is not a configuration mistake, and no amount of
+  clicking fixes it in place.
+- **A new search shows "No items match this search" until the page is
+  refreshed.** This false negative is the single most misleading thing in
+  the whole flow. Reload before concluding anything is broken.
+- **Filters live under the node's `···` → Filter by.** The toolbar row is
+  only Filter-by-name / Display / Group / Sort. Easy to hunt for and miss.
+- **Sort defaults to an arbitrary field** (observed: "Closed", "Alerts")
+  and Ascending. Always set both field and direction explicitly.
+- **Date filters offer only discrete relative periods** — Today,
+  Yesterday, Last week, This week, This month, … plus Set / Not set.
+  There is **no "before today"**, so *overdue* is not expressible as a
+  filter. Approximate with ascending sort, and let the watcher
+  (`scripts/watcher.py`) do real overdue detection — it can, and it
+  escalates.
+- **Pre-2026-04 searches store the query as the node title.** Renaming
+  them breaks the query. Wrap them in a labelled parent node instead.
+  UI-created searches keep title and query separate and rename freely.
+- **A search filtering on a tag carries that tag**, so it appears in its
+  own results alongside templates and other searches. Adding any field
+  filter (e.g. `Status = Open`) sweeps them out, since they have no field
+  values.
+- **The MCP returns a CACHED snapshot of a search's children, not a live
+  evaluation.** `get_children` on a search node can be months stale.
+  Never conclude a search works or fails from MCP output — only the UI
+  is authoritative. Ask Ruben for a screenshot.
+
 ## Tana Paste Best Practices
 
 When writing nodes to Tana:
+- **Any `#word` in pasted text becomes a real supertag application.**
+  Writing "scoped to #Day nodes" in prose silently tags that node `#Day`.
+  This created junk instances three separate times in one session,
+  including phantom `#health-protocol` rows that the Health HQ extractor
+  would have ingested as real doses. When writing *about* a tag, drop the
+  hash or write it as `health-protocol (tag zwXVTSJnD38q)`.
 - Always use tag IDs: `#[[^tagID]]` not `#tagname`
 - Always use field IDs: `[[^fieldID]]:: value` not `Field Name:: value`
 - Use `get_tag_schema` with `includeEditInstructions: true` before writing to confirm field IDs
