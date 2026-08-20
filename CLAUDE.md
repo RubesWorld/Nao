@@ -185,7 +185,12 @@ nothing is exposed. `snooze 7d [n]` / `done [n]` / `drop [n]` / `status` are
 handled directly against the watcher state (n = item number from the last
 alert; a bare `done` on a multi-item alert asks which rather than clearing
 all). `done` on a promise closes it in Tana; on a person it stamps Last
-interaction. Anything else is passed to `claude -p` **with conversation
+interaction. `triage` proposes routing for Capture Inbox items (articles →
+#resource with WebFetch-distilled Key takeaways, ideas → #idea Raw, to-dos →
+#Task with Context; uncertain items stay put) — same propose/`do 1,3`/
+confirm flow as `cleanup`, nothing changes without approval, and the
+morning briefing counts waiting captures so the inbox can't rot silently.
+Anything else is passed to `claude -p` **with conversation
 continuity**: freeform exchanges accumulate in `state/bridge-transcript.json`
 (last 8, reset after 30 idle minutes or `reset`) so follow-ups like "actually
 make it Friday" have context. Conversational surface: a typing indicator

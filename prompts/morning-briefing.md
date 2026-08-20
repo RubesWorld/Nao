@@ -31,6 +31,7 @@ If no briefing exists yet, gather data:
 7. Search for tasks needing attention:
    - Overdue tasks: `search_nodes` with `hasType: "2QEEKpJYzp8R"`, `overdue: true`. Surface ALL.
    - High-priority open tasks: `search_nodes` with `hasType: "2QEEKpJYzp8R"`, `field: { fieldId: "ziKP2SPwipcw", stringValue: "High" }`, also filter for status Backlog or In progress. Surface top 3.
+8. Check the Capture Inbox: `get_children` of node `drg2JUfK3f-A_CAPTURE_INBOX`. Count the items and note the first few titles. Do NOT process, file, or move anything — triage happens through the Telegram `triage` command, not here.
 
 # Step 3: Write the briefing to Tana
 
@@ -48,7 +49,7 @@ Body of the briefing (as children under the digest node):
 - **Stale projects** — list active projects with no session-digest activity in 7+ days. One line each: "<name> — last touched <date>, next action: <next action>". Skip section if none.
 - **Stale facts/preferences** — count only. "<N> facts and <M> preferences haven't been confirmed in 90+ days." Skip if zero.
 - **Reach out today** — surface the highest-priority Person whose Next reach out date is today or earlier. Skip if none.
-- **Inbox items** — if today's daily note has child nodes that look like unprocessed items (raw text, not tagged with anything), surface them under this section so they don't get lost. Format: "<text> (in daily note — needs processing)". Skip if none.
+- **Inbox** — two sources, one section. (a) Capture Inbox items from step 8: "<N> captures waiting — <first 3 titles> — reply `triage` to Nao on Telegram to file them." (b) Untagged child nodes in today's daily note (raw text, no supertag): "<text> (in daily note — needs processing)". Skip the section only if both are empty.
 
 Keep the whole briefing under 30 lines. If a section is empty, omit it entirely. Do not invent data — if something isn't in Tana, don't include it.
 
@@ -71,6 +72,11 @@ Format: 2-4 short lines. Use line breaks, not bullets. Lead with the most time-s
 ```
 📥 3 inbox items in daily note (Lindsay Barranco, Boston flights, Ericah call)
 💤 1 stale project: Nao Build
+```
+
+```
+📥 4 captures in inbox (2 articles, 2 ideas) — reply `triage`
+⚠️ Call Ericah (due today)
 ```
 
 Rules:
