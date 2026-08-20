@@ -45,7 +45,7 @@ and environmental awareness.
 | Computer use | Cowork Computer Use | ✅ available; last-resort per CLAUDE.md decision rule; never for banking |
 | Remote dev | Claude Code CLI + Channels + VPS | 🔁 Claude Code on the web + the bridge; no VPS (see Phase 6) |
 | Communication search | Traul | ⏳ never installed (see Open items) |
-| Calendar of record | (implicit) | ✅ Google Calendar (nycrar@gmail.com); headless access via `scripts/calendar-today.sh` (gcalcli) |
+| Calendar of record | (implicit) | ✅ Google Calendar (nycrar@gmail.com); reachable from headless runs via the Google Calendar MCP |
 | Self-monitoring | (not in plan) | ✅ `scripts/health-check.py`, weekly |
 
 ## 3. Memory model
@@ -102,10 +102,10 @@ after payday, so the deposit has settled). Open question, low stakes.
 - Promise Deadline Monitor: ✅ built, then 🔁 superseded by the watcher
   (stateful + escalating beats fire-every-2-hours).
 - Weekly Review: ✅.
-- **Pre-Meeting Context Prep: ⏳ never built** — was blocked on real
-  calendar data, which `calendar-today.sh` finally provides (pending gcalcli
-  OAuth). Build it as one morning pass over today's agenda, not the plan's
-  every-30-minutes poll.
+- **Pre-Meeting Context Prep: ⏳ never built** — was blocked on a belief
+  that headless runs could not reach the calendar. They can, through the
+  Google Calendar MCP. Build it as one morning pass over today's agenda, not
+  the plan's every-30-minutes poll.
 - **Traul (+ SMS Backup+): ⏳ never installed.** Unified comms search is
   still the gap the plan said it was. Re-scope before building: Cowork now
   has Gmail / Google Calendar / Krisp MCPs, which cover part of the promise.

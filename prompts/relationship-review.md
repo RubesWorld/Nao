@@ -25,7 +25,7 @@ Cadence-to-days mapping (for reach-out window math):
 
 `search_nodes` with `hasType: "cQ7tTJTcfs72"`. For each Person:
 - Read the node to get Last interaction (`q5wo_UUohjlq`), Cadence (`wVnOpgqJYQJT`), Relationship (`fxpCQuDuXPd7`), Important dates (`3AemJsZ4ADDe`), Next reach out (`7F-NpOa3hg5j`), Context, Notes, Interests
-- For each, search related #interaction nodes by Person field — note the most recent and its Vibe
+- For each, search related interaction nodes (tag `1y3M8tt6ahGs`) by Person field — note the most recent and its Vibe
 
 # Step 4: Categorize each person
 
@@ -37,16 +37,16 @@ Build these buckets:
 
 **Birthdays / important dates this week** — Important dates field contains a date in next 7 days (match by month/day, ignore year).
 
-**Stale relationships** — Relationship = Family or Close friend AND no #interaction in last 60 days, regardless of cadence.
+**Stale relationships** — Relationship = Family or Close friend AND no interaction (tag `1y3M8tt6ahGs`) in last 60 days, regardless of cadence.
 
-**Concerning vibes** — most recent #interaction has Vibe = Off or Concerning. Always surface these.
+**Concerning vibes** — most recent interaction (tag `1y3M8tt6ahGs`) has Vibe = Off or Concerning. Always surface these.
 
 # Step 5: Build outreach context
 
 For each person flagged, gather:
 - Brief Context summary (1 line from their Context field)
 - Most recent interaction summary if any (date, vibe, what they shared)
-- Any open #promise nodes linked to them
+- Any open promise nodes (tag `CPJBjsqaUr6F`) linked to them
 - Suggested reach-out angle: based on their Interests, recent updates, or what they last shared. Be specific — "ask about <thing>" beats "check in."
 
 # Step 6: Write the review to Tana
@@ -66,6 +66,14 @@ Body sections (omit empty ones, list each person with full context block):
 - **Concerning vibes** — `<Name> — last interaction <date>, Vibe: <vibe>. <Context>. <Suggested check-in>.`
 
 Keep tight — under 60 lines total. List specific names. No "you should reach out more" lectures.
+
+**Never write a bare `#word` into Tana.** Tana turns any `#word` in pasted
+text into a real supertag application and strips it from the visible text.
+Writing "no #interaction in 60 days" in a review line silently tags that
+line `#interaction`, and it then shows up as a real hangout in every later
+search — which is exactly how this review poisoned its own input once
+already. Write "interaction (tag `1y3M8tt6ahGs`)" instead, or just drop
+the hash. This applies to every tag name, not only this one.
 
 # Step 7: Telegram (stdout)
 

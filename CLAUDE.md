@@ -118,7 +118,6 @@ Nao's autonomous heartbeat runs as launchd jobs (NOT Cowork `/schedule`, since r
 ├── scripts/run-task.sh        # Generic wrapper — sets PATH, logs, runs claude CLI
 ├── scripts/nao_telegram.py    # THE Telegram sender (chunking, buttons) — never add another
 ├── scripts/tana_client.py     # Direct HTTP client for the tana-local MCP (no LLM)
-├── scripts/calendar-today.sh  # Today's Google Calendar agenda via gcalcli (empty = no data)
 ├── scripts/health-check.py    # Weekly: did every job actually run? (deterministic)
 ├── prompts/<task-name>.md     # One markdown file per scheduled task
 ├── briefings/                 # Output cache (auto-named YYYY-MM-DD-<task>.md)
@@ -137,10 +136,14 @@ Nao's autonomous heartbeat runs as launchd jobs (NOT Cowork `/schedule`, since r
 - Prompts should **skip empty sections** — no "no items" filler text. Quiet by default.
 - Final stdout is one line confirming what was written and where (node ID + count)
 
-**Calendar of record is Google Calendar (nycrar@gmail.com).** Headless jobs
-read it via `scripts/calendar-today.sh` (gcalcli under the hood — one-time
-OAuth setup in `docs/calendar-setup.md`). Empty output means no calendar
-data, never an error; prompts must skip the section, not guess.
+**Calendar of record is Google Calendar (nycrar@gmail.com).** The Google
+Calendar MCP **is** reachable from headless `claude -p` under launchd
+(verified 2026-08-19), so no CLI shim or second OAuth token is needed — read
+it through the MCP. An earlier note claiming headless runs had no calendar
+access was simply wrong, and it suppressed every calendar feature for months.
+
+The morning briefing still does not read the calendar. That is a scope
+choice, not a limitation.
 
 **Active tasks:** `morning-briefing`, `end-of-day-digest`, `weekly-review`,
 `relationship-review`, `mid-week-budget-check`, `payday-allocation-check`,
