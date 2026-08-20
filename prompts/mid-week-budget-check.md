@@ -37,7 +37,7 @@ Get today's daily note. Use `import_tana_paste` under it. Tag `#[[^IRxH3qTXUQLe]
 - Cash flow note (`EsW_mDpc7Xr1`): brief — "On pace" / "Heavy week" / "Quiet week"
 - Date (`evzVkMOAhfoP`): TODAY
 
-# Step 7: Telegram (stdout)
+# Step 6: Telegram (stdout)
 
 Short readable summary, max 200 chars. Lead with the actionable bit. If nothing's notable, say so plainly.
 
