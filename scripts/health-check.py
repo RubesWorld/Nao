@@ -28,9 +28,18 @@ AGENTS_GLOB = os.path.expanduser("~/Library/LaunchAgents/com.nao.*.plist")
 WINDOW_DAYS = 7
 WATCHER_MAX_GAP_HOURS = 3   # hourly job; allow some sleep slack
 
+# Ambient jobs log "<name>: ..." rather than the START/END pairs run-task.sh
+# emits, so run-counting cannot see them. Each gets a freshness check instead,
+# keyed by how often it is supposed to fire.
+AMBIENT_MAX_GAP_HOURS = {
+    "watcher": WATCHER_MAX_GAP_HOURS,
+    "calendar-capture": 30,   # nightly at 21:30, plus slack for a sleeping mini
+}
+
 # Managed outside run-task.sh; checked by their own signals below.
 SPECIAL = {"com.nao.watcher", "com.nao.telegram-bridge",
-           "com.nao.health-check"}
+           "com.nao.health-check", "com.nao.calendar-capture",
+           "com.nao.bluebubbles", "com.nao.display-menu"}
 
 
 def expected_runs(plist_path, window_days):
@@ -68,12 +77,14 @@ def task_name(plist_path):
 
 
 def parse_log(window_start):
-    """tasks.log → per-task {ok, failed, skipped}, plus last watcher stamp."""
-    stats, watcher_last = {}, None
+    """tasks.log → per-task {ok, failed, skipped}, plus last-seen stamps for
+    the ambient jobs, which log a prefix instead of START/END pairs."""
+    stats, ambient_last = {}, {}
     if not os.path.exists(LOG_PATH):
-        return stats, watcher_last
+        return stats, ambient_last
+    ambient_alt = "|".join(n + ":" for n in AMBIENT_MAX_GAP_HOURS)
     line_re = re.compile(
-        r"^\[([0-9T:+\-Z]+)\]\s+(START|END|SKIP|watcher:)\s*(.*)$")
+        r"^\[([0-9T:+\-Z]+)\]\s+(START|END|SKIP|%s)\s*(.*)$" % ambient_alt)
     with open(LOG_PATH) as f:
         for line in f:
             m = line_re.match(line.strip())
@@ -86,8 +97,10 @@ def parse_log(window_start):
                 continue
             if stamp < window_start:
                 continue
-            if kind == "watcher:":
-                watcher_last = stamp
+            if kind.endswith(":"):
+                name = kind[:-1]
+                if name not in ambient_last or stamp > ambient_last[name]:
+                    ambient_last[name] = stamp
                 continue
             name = rest.split()[0] if rest.split() else "?"
             entry = stats.setdefault(name, {"ok": 0, "failed": 0, "skipped": 0})
@@ -98,13 +111,13 @@ def parse_log(window_start):
                     entry["failed"] += 1
                 else:
                     entry["ok"] += 1
-    return stats, watcher_last
+    return stats, ambient_last
 
 
 def main():
     now = datetime.now(timezone.utc)
     window_start = now - timedelta(days=WINDOW_DAYS)
-    stats, watcher_last = parse_log(window_start)
+    stats, ambient_last = parse_log(window_start)
 
     problems, fine = [], []
 
@@ -125,11 +138,15 @@ def main():
         elif ran:
             fine.append(name)
 
-    if watcher_last is None:
-        problems.append("watcher: no log lines in %d days" % WINDOW_DAYS)
-    elif now - watcher_last > timedelta(hours=WATCHER_MAX_GAP_HOURS):
-        problems.append("watcher: last ran %s ago"
-                        % str(now - watcher_last).split(".")[0])
+    for name, max_gap in sorted(AMBIENT_MAX_GAP_HOURS.items()):
+        last = ambient_last.get(name)
+        if last is None:
+            problems.append("%s: no log lines in %d days" % (name, WINDOW_DAYS))
+        elif now - last > timedelta(hours=max_gap):
+            problems.append("%s: last ran %s ago"
+                            % (name, str(now - last).split(".")[0]))
+        else:
+            fine.append(name)
 
     lock = os.path.join(NAO, "state", "telegram-bridge.lock")
     bridge_ok = False
