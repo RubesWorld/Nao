@@ -46,6 +46,8 @@ EXECUTE_PROMPT = os.path.join(NAO, "prompts", "cleanup-execute.md")
 CAL_PENDING = os.path.join(STATE_DIR, "calendar-pending.json")
 CAL_SEEN = os.path.join(STATE_DIR, "calendar-seen.json")
 CAL_LOG_PROMPT = os.path.join(NAO, "prompts", "calendar-log.md")
+TRIAGE_PROPOSE = os.path.join(NAO, "prompts", "triage-propose.md")
+TRIAGE_EXECUTE = os.path.join(NAO, "prompts", "triage-execute.md")
 LOCK_PATH = os.path.join(STATE_DIR, "telegram-bridge.lock")
 AUDIT_LOG = os.path.join(NAO, "logs", "telegram-bridge.log")
 
@@ -67,11 +69,24 @@ TRANSCRIPT_REPLY_CHARS = 1500   # stored reply excerpt; full reply still sent
 # the bridge legitimately does goes through these tools. Override with
 # NAO_BRIDGE_TOOLS (comma-separated) in .env; set it to * to restore the
 # old skip-permissions behavior if the allowlist ever blocks something.
+# The invariant this list defends: a leaked bot token must never equal a
+# shell on the mini. No arbitrary Bash, no Write/Edit (Nao never modifies
+# its own code over an internet channel), nothing that reads .env or keys.
+# Within that line, capability is negotiable — widened 2026-08-20 by
+# Ruben's call so the deployed allowlist never feels tight.
 DEFAULT_ALLOWED_TOOLS = [
     "mcp__tana-local",      # all Tana tools — read AND write, Nao's memory
     "mcp__monarch-money",   # finance questions
     "Read",
-    "Bash(date:*)",         # prompts need today's date, nothing more
+    "Bash(date:*)",         # prompts need today's date
+    "WebSearch",            # "look up X" from the phone
+    "WebFetch",             # read a link Ruben sends
+    # Nao's own repo-authored scripts, by explicit command — both the
+    # cwd-relative and ~ forms, since Bash rules match the literal text:
+    "Bash(python3 scripts/watcher.py:*)",
+    "Bash(python3 ~/Nao/scripts/watcher.py:*)",
+    "Bash(python3 scripts/health-check.py:*)",
+    "Bash(python3 ~/Nao/scripts/health-check.py:*)",
 ]
 
 # Model routing: explicit prefixes only — deterministic, no surprise bills.
@@ -293,11 +308,37 @@ def write_json(path, obj):
 # alert should be instant, free, and impossible to misinterpret.
 # --------------------------------------------------------------------------
 
-def propose_cleanup(scope):
+# Cleanup and triage share one propose/confirm mechanism: a proposer prompt
+# emits a JSON list, Python owns the numbering and the pending file, and the
+# same `do 1,3` / buttons apply whichever proposal is currently pending.
+PROPOSAL_KINDS = {
+    "cleanup": {
+        "execute_prompt": EXECUTE_PROMPT,
+        "verbs": {"trash": "trash", "mark_outdated": "mark outdated",
+                  "mark_done": "mark done"},
+        "extra_tools": None,
+        "empty": "Nothing to clean up in that scope.",
+    },
+    "triage": {
+        "execute_prompt": TRIAGE_EXECUTE,
+        "verbs": {"resource": "→ #resource", "idea": "→ #idea (Raw)",
+                  "task": "→ #Task", "trash": "trash",
+                  "keep": "leave in inbox"},
+        # The execute prompt fetches saved articles to fill Key takeaways.
+        # WebFetch is granted ONLY here — the fixed repo-authored prompt —
+        # never to freeform internet-supplied text, which would open an
+        # exfiltration channel.
+        "extra_tools": ["WebFetch"],
+        "empty": "Inbox is empty. Nothing to triage.",
+    },
+}
+
+
+def propose(kind, prompt_path, prompt_suffix=""):
     """Read-only scan. Writes the numbered list Python owns, not the model."""
-    with open(PROPOSE_PROMPT) as f:
+    with open(prompt_path) as f:
         prompt = f.read()
-    prompt += "\n\n# Scope for this run\n\n%s\n" % (scope or "all")
+    prompt += prompt_suffix
 
     out = run_claude(prompt, model="sonnet")
     match = re.search(r"\[.*\]", out, re.DOTALL)
@@ -309,20 +350,22 @@ def propose_cleanup(scope):
         return "Proposal wasn't valid JSON (%s). Nothing changed." % e
 
     if not items:
-        write_json(PENDING, {"items": [], "at": datetime.now(timezone.utc).isoformat()})
-        return "Nothing to clean up in that scope."
+        write_json(PENDING, {"kind": kind, "items": [],
+                             "at": datetime.now(timezone.utc).isoformat()})
+        return PROPOSAL_KINDS[kind]["empty"]
 
     items = items[:12]
-    write_json(PENDING, {"items": items,
+    write_json(PENDING, {"kind": kind, "items": items,
                          "at": datetime.now(timezone.utc).isoformat()})
 
-    verb = {"trash": "trash", "mark_outdated": "mark outdated", "mark_done": "mark done"}
+    verbs = PROPOSAL_KINDS[kind]["verbs"]
     lines = ["Proposed (nothing changed yet):"]
     for i, it in enumerate(items, 1):
         lines.append("%d. %s — %s" % (i, it.get("title", "?"),
-                                      verb.get(it.get("action"), it.get("action"))))
-        if it.get("reason"):
-            lines.append("     %s" % it["reason"])
+                                      verbs.get(it.get("action"), it.get("action"))))
+        note = it.get("reason") or it.get("note")
+        if note:
+            lines.append("     %s" % note)
     lines.append("")
     lines.append("or type `do 1,3` to pick specific ones")
 
@@ -333,10 +376,23 @@ def propose_cleanup(scope):
     return "\n".join(lines), [[("Apply all", "c:all"), ("Cancel", "c:no")]]
 
 
+def propose_cleanup(scope):
+    return propose("cleanup", PROPOSE_PROMPT,
+                   "\n\n# Scope for this run\n\n%s\n" % (scope or "all"))
+
+
+def propose_triage():
+    return propose("triage", TRIAGE_PROPOSE)
+
+
 def execute_cleanup(selection):
-    pending = read_json(PENDING, {}).get("items") or []
+    stored = read_json(PENDING, {})
+    pending = stored.get("items") or []
+    # Pre-triage pending files carry no kind; they were always cleanup.
+    kind = PROPOSAL_KINDS.get(stored.get("kind", "cleanup")) \
+        or PROPOSAL_KINDS["cleanup"]
     if not pending:
-        return "No pending proposal. Send `cleanup` first."
+        return "No pending proposal. Send `cleanup` or `triage` first."
 
     if selection.strip() in ("all", "*"):
         chosen = list(range(len(pending)))
@@ -355,13 +411,15 @@ def execute_cleanup(selection):
         return "Nothing selected."
 
     picked = [pending[i] for i in sorted(set(chosen))]
-    with open(EXECUTE_PROMPT) as f:
+    with open(kind["execute_prompt"]) as f:
         prompt = f.read()
     prompt += "\n\n```json\n%s\n```\n" % json.dumps(picked, indent=2)
 
-    audit("CLEANUP EXECUTE %d item(s): %s"
-          % (len(picked), ", ".join(p.get("id", "?") for p in picked)))
-    result = run_claude(prompt, model="sonnet")
+    audit("%s EXECUTE %d item(s): %s"
+          % (stored.get("kind", "cleanup").upper(), len(picked),
+             ", ".join(p.get("id", "?") for p in picked)))
+    result = run_claude(prompt, model="sonnet",
+                        extra_tools=kind["extra_tools"])
 
     # Consume the proposal either way — stale numbering is how the wrong
     # thing gets deleted on a second `do`.
@@ -477,6 +535,9 @@ def builtin(text):
                 "  reset         — forget the current conversation thread\n"
                 "  cleanup [facts|promises|schema|all]\n"
                 "                — propose tidy-ups, changes nothing\n"
+                "  triage        — propose routing for capture-inbox items\n"
+                "                  (articles → #resource w/ takeaways, ideas,\n"
+                "                  tasks); changes nothing until you confirm\n"
                 "  do 1,3 / do all / no\n"
                 "                — act on the last proposal\n"
                 "  log 1,3 / log all / no\n"
@@ -494,6 +555,9 @@ def builtin(text):
     if cmd == "cleanup" or cmd.startswith("cleanup "):
         return propose_cleanup(cmd[len("cleanup"):].strip())
 
+    if cmd in ("triage", "/triage", "inbox"):
+        return propose_triage()
+
     if cmd == "do" or cmd.startswith("do "):
         return execute_cleanup(cmd[len("do"):].strip())
 
@@ -509,9 +573,12 @@ def builtin(text):
         # than guess. Declining everything pending is never the wrong reading
         # of "no", and nothing here writes to Tana.
         replies = []
-        if read_json(PENDING, {}).get("items"):
+        stored = read_json(PENDING, {})
+        if stored.get("items"):
+            # PENDING is shared by cleanup and triage — name the right one.
+            kind = stored.get("kind", "cleanup")
             write_json(PENDING, {"items": []})
-            replies.append("Discarded the cleanup proposal. Nothing changed.")
+            replies.append("Discarded the %s proposal. Nothing changed." % kind)
         if read_json(CAL_PENDING, {}).get("items"):
             replies.append(execute_calendar("no"))
         if replies:
@@ -662,7 +729,7 @@ def allowed_tools():
     return DEFAULT_ALLOWED_TOOLS
 
 
-def run_claude(text, model=None):
+def run_claude(text, model=None, extra_tools=None):
     env = dict(os.environ)
     env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
     cmd = ["claude", "-p", "--model", model or MODEL, "--output-format", "text"]
@@ -671,7 +738,9 @@ def run_claude(text, model=None):
         cmd.append("--dangerously-skip-permissions")
     else:
         cmd.append("--allowedTools")
-        cmd.extend(tools)
+        # extra_tools widen ONE fixed-prompt invocation (e.g. WebFetch for
+        # triage enrichment) — never the freeform path.
+        cmd.extend(tools + (extra_tools or []))
     try:
         proc = subprocess.run(
             cmd, input=text, capture_output=True, text=True,
@@ -885,7 +954,7 @@ def main():
             # Most builtins are instant, but cleanup/do call Claude and can
             # take a minute. A silent gap reads as broken, so ack those too.
             lowered = text.strip().lower()
-            if (lowered.startswith(("cleanup", "do ", "log "))
+            if (lowered.startswith(("cleanup", "triage", "do ", "log "))
                     or lowered in ("do", "log")):
                 send(token, chat_id, "on it…")
 

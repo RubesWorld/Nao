@@ -195,7 +195,12 @@ nothing is exposed. `snooze 7d [n]` / `done [n]` / `drop [n]` / `status` are
 handled directly against the watcher state (n = item number from the last
 alert; a bare `done` on a multi-item alert asks which rather than clearing
 all). `done` on a promise closes it in Tana; on a person it stamps Last
-interaction. Anything else is passed to `claude -p` **with conversation
+interaction. `triage` proposes routing for Capture Inbox items (articles →
+#resource with WebFetch-distilled Key takeaways, ideas → #idea Raw, to-dos →
+#Task with Context; uncertain items stay put) — same propose/`do 1,3`/
+confirm flow as `cleanup`, nothing changes without approval, and the
+morning briefing counts waiting captures so the inbox can't rot silently.
+Anything else is passed to `claude -p` **with conversation
 continuity**: freeform exchanges accumulate in `state/bridge-transcript.json`
 (last 8, reset after 30 idle minutes or `reset`) so follow-ups like "actually
 make it Friday" have context. Conversational surface: a typing indicator
@@ -211,10 +216,14 @@ internet on a machine holding Tana, Monarch auth, `.env`, and SSH keys. The
 `TELEGRAM_CHAT_ID` allowlist is the primary boundary: a bot token is a bearer
 credential, so anyone holding it can message the bot. Non-allowlisted senders
 are logged and get **no reply** — a reply confirms the bot is live. Freeform
-commands run with an explicit tool allowlist (Tana, Monarch, Read,
-`Bash(date:*)` — override via `NAO_BRIDGE_TOOLS` in .env, `*` restores
-skip-permissions and should stay a temporary debugging state), never blanket
-`--dangerously-skip-permissions`. Every command is audited to
+commands run with an explicit tool allowlist (Tana, Monarch, Read, web
+search/fetch, `date`, and Nao's own scripts — watcher, health-check — by
+explicit command; override via `NAO_BRIDGE_TOOLS` in .env,
+`*` restores skip-permissions and should stay a temporary debugging state),
+never blanket `--dangerously-skip-permissions`. **The invariant: a leaked
+bot token must never equal a shell** — no arbitrary Bash, no Write/Edit
+(Nao never modifies its own code over an internet channel), nothing that
+reads `.env` or keys. Widen within that line; never across it. Every command is audited to
 `logs/telegram-bridge.log`, rate limited to 30/hr, and the update offset is
 persisted *before* execution so a crash loses a command rather than
 replaying it.
