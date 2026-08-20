@@ -154,10 +154,12 @@ Rough priority order:
    calendar access). One morning task: read today's agenda, cross-reference
    #Person / #promise / #session-digest / #interaction, write prep briefs
    under the daily note. Quiet when the calendar is empty.
-2. **Richer conversational access to Nao** (bridge UX): typing indicator
-   while working, voice-note transcription, smarter continuity, per-message
-   model routing. Incremental bridge upgrades — not a framework swap (see
-   Section 6).
+2. **Richer conversational access to Nao** (bridge UX): 🔶 mostly shipped
+   2026-08-20 — typing indicator, voice-note transcription (local
+   whisper.cpp, `docs/voice-setup.md`), `!deep`/`!fast` model routing.
+   Remaining: deeper continuity via `--resume` sessions, only if the
+   8-exchange transcript proves shallow in practice. Incremental bridge
+   upgrades — not a framework swap (see Section 6).
 3. **fact_contradiction detection** — sharpen the weekly review's
    contradiction step (compare recent #session-digest content against
    #fact/#preference nodes; propose `mark_outdated` via the existing
@@ -194,3 +196,5 @@ Rough priority order:
 | 2026-08 | Ambient layer shipped: stateful watcher + Telegram bridge (`plans/ambient-nao.md`). Tana search-node rules documented after the TODAY HQ rebuild. |
 | 2026-08-20 | Hardening PR (#1): watcher state keyed by node id, per-item alert actions, persistent drop, local-time deadlines, deterministic HTTP retrieval with LLM fallback, bridge tool allowlist + transcript continuity, one Telegram sender, run-task timeout/skip/failure pings, weekly health-check, calendar wrapper (Google Calendar = calendar of record). |
 | 2026-08-20 | Sequential Thinking / Markdownify / Context7 MCPs formally rejected. VPS layer formally closed as obsoleted. Blueprint converted to this living document. |
+| 2026-08-20 | Bridge conversational upgrades shipped: typing indicator, local voice-note transcription, explicit model routing. OpenClaw-class framework swap reconfirmed as rejected — features get added to the bridge instead. |
+| 2026-08-20 | Tana announced a **hosted MCP server (beta)** (July 2026 newsletter, outliner.tana.inc/learn/features/local-api-mcp#hosted-mcp-server-beta). Capabilities under evaluation — if it supports reads, the localhost constraint falls; see roadmap item 8. |

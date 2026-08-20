@@ -21,8 +21,10 @@ SECURITY — read before changing anything here.
 import json
 import re
 import os
+import shutil
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -69,6 +71,20 @@ DEFAULT_ALLOWED_TOOLS = [
     "Bash(date:*)",         # prompts need today's date, nothing more
 ]
 
+# Model routing: explicit prefixes only — deterministic, no surprise bills.
+# "!deep why is my savings rate flat" escalates; "!fast next payday" is a
+# cheap quick answer. Everything else uses NAO_BRIDGE_MODEL (sonnet).
+DEEP_MODEL = os.environ.get("NAO_BRIDGE_DEEP_MODEL", "opus")
+FAST_MODEL = os.environ.get("NAO_BRIDGE_FAST_MODEL", "haiku")
+
+# Voice notes: transcribed locally on the mini (see docs/voice-setup.md),
+# then handled exactly like typed text. Caps keep a stray 40-minute memo
+# from pinning the CPU.
+VOICE_MAX_SECONDS = int(os.environ.get("NAO_VOICE_MAX_SECONDS", "300"))
+WHISPER_MODEL = os.environ.get(
+    "NAO_WHISPER_MODEL",
+    os.path.join(NAO, "models", "ggml-base.en.bin"))
+
 _recent = []   # command timestamps, for rate limiting
 
 
@@ -108,6 +124,116 @@ def send(token, chat_id, text, markup=None):
     last chunk). markup = [[(label, callback_data), ...], ...]."""
     if not tg_send(text, keyboard=markup, token=token, chat_id=chat_id):
         audit("send failed (see stderr)")
+
+
+class Typing:
+    """Shows 'typing…' in the chat while work runs. Telegram's indicator
+    expires after ~5 seconds, so a daemon thread refreshes it until the
+    work finishes. Failures are swallowed — liveness UX must never break
+    the command itself."""
+
+    def __init__(self, token, chat_id):
+        self.token, self.chat_id = token, chat_id
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def _run(self):
+        while not self._stop.is_set():
+            try:
+                api(self.token, "sendChatAction",
+                    {"chat_id": self.chat_id, "action": "typing"}, timeout=10)
+            except Exception:
+                pass
+            self._stop.wait(4)
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+
+
+def route_model(text):
+    """Explicit model prefixes. Returns (model_or_None, stripped_text) —
+    None means the default NAO_BRIDGE_MODEL."""
+    m = re.match(r"^!(deep|think)\b\s*", text, re.IGNORECASE)
+    if m:
+        return DEEP_MODEL, text[m.end():].strip()
+    m = re.match(r"^!(fast|quick)\b\s*", text, re.IGNORECASE)
+    if m:
+        return FAST_MODEL, text[m.end():].strip()
+    return None, text
+
+
+# --------------------------------------------------------------------------
+# Voice notes. Telegram delivers them as OGG/Opus; we transcribe LOCALLY on
+# the mini (whisper.cpp) so audio never leaves the machine, then treat the
+# text exactly like a typed message. Setup: docs/voice-setup.md. Until the
+# tools are installed this degrades to a polite "not set up yet" reply.
+# --------------------------------------------------------------------------
+
+def download_voice(token, file_id, dest):
+    resp = api(token, "getFile", {"file_id": file_id})
+    file_path = (resp.get("result") or {}).get("file_path")
+    if not file_path:
+        raise RuntimeError("Telegram getFile returned no path")
+    url = "https://api.telegram.org/file/bot%s/%s" % (token, file_path)
+    with urllib.request.urlopen(url, timeout=60) as r, open(dest, "wb") as f:
+        shutil.copyfileobj(r, f)
+
+
+def transcribe(audio_path):
+    """OGG in, text out. NAO_TRANSCRIBE_CMD ({file} placeholder) overrides
+    the default ffmpeg + whisper-cli pipeline."""
+    custom = os.environ.get("NAO_TRANSCRIBE_CMD")
+    if custom:
+        proc = subprocess.run(custom.replace("{file}", audio_path),
+                              shell=True, capture_output=True, text=True,
+                              timeout=300)
+        if proc.returncode != 0:
+            raise RuntimeError("transcribe command failed: %s"
+                               % proc.stderr.strip()[:200])
+        return proc.stdout.strip()
+
+    ffmpeg = shutil.which("ffmpeg")
+    whisper = shutil.which("whisper-cli") or shutil.which("whisper-cpp")
+    if not (ffmpeg and whisper and os.path.exists(WHISPER_MODEL)):
+        raise RuntimeError("transcription isn't set up on the mini yet — "
+                           "see docs/voice-setup.md")
+
+    wav = audio_path + ".wav"
+    try:
+        subprocess.run([ffmpeg, "-y", "-i", audio_path,
+                        "-ar", "16000", "-ac", "1", wav],
+                       capture_output=True, timeout=60, check=True)
+        proc = subprocess.run([whisper, "-m", WHISPER_MODEL, "-f", wav,
+                               "-np", "-nt"],
+                              capture_output=True, text=True, timeout=300)
+        if proc.returncode != 0:
+            raise RuntimeError("whisper failed: %s" % proc.stderr.strip()[:200])
+        return proc.stdout.strip()
+    finally:
+        if os.path.exists(wav):
+            os.remove(wav)
+
+
+def voice_to_text(token, voice):
+    duration = voice.get("duration", 0)
+    if duration > VOICE_MAX_SECONDS:
+        raise RuntimeError("that's %ds of audio — cap is %ds. Send a "
+                           "shorter note." % (duration, VOICE_MAX_SECONDS))
+    ogg = os.path.join(STATE_DIR, "voice-inbox.ogg")
+    os.makedirs(STATE_DIR, exist_ok=True)
+    try:
+        download_voice(token, voice["file_id"], ogg)
+        text = transcribe(ogg)
+    finally:
+        if os.path.exists(ogg):
+            os.remove(ogg)
+    if not text:
+        raise RuntimeError("transcription came back empty")
+    return text
 
 
 # A tap resolves to the same string a typed command would produce, so there
@@ -273,7 +399,11 @@ def builtin(text):
                 "                — propose tidy-ups, changes nothing\n"
                 "  do 1,3 / do all / no\n"
                 "                — act on the last proposal\n"
-                "anything else is passed to Nao")
+                "anything else is passed to Nao:\n"
+                "  !deep …       — harder question, bigger model\n"
+                "  !fast …       — quick lookup, cheap model\n"
+                "  🎤 voice note  — transcribed on the mini, then handled "
+                "as text")
 
     if cmd in ("reset", "/reset", "new topic"):
         write_json(TRANSCRIPT_PATH, {"exchanges": []})
@@ -598,7 +728,8 @@ def main():
                 if not cmd:
                     continue
 
-                result = builtin(cmd)
+                with Typing(token, chat_id):
+                    result = builtin(cmd)
                 if isinstance(result, tuple):
                     result = result[0]
                 result = result or "(nothing to do)"
@@ -628,6 +759,22 @@ def main():
                 audit("REJECTED chat_id=%s from=%r text=%r"
                       % (chat_id, msg.get("from", {}).get("username"), text[:80]))
                 continue          # deliberately no reply
+
+            # ---- voice notes: transcribe, then treat as typed ----------
+            if not text and msg.get("voice"):
+                try:
+                    with Typing(token, chat_id):
+                        text = voice_to_text(token, msg["voice"])
+                    audit("VOICE %ds -> %r"
+                          % (msg["voice"].get("duration", 0), text[:200]))
+                    # Echo the transcript so a mishearing is obvious before
+                    # the reply arrives.
+                    send(token, chat_id, "🎤 %s" % text)
+                except Exception as e:
+                    audit("VOICE failed: %s" % e)
+                    send(token, chat_id, "Couldn't transcribe that — %s" % e)
+                    continue
+
             if not text:
                 continue
             if rate_limited():
@@ -644,7 +791,8 @@ def main():
             if lowered.startswith(("cleanup", "do ")) or lowered == "do":
                 send(token, chat_id, "on it…")
 
-            reply = builtin(text)
+            with Typing(token, chat_id):
+                reply = builtin(text)
             if reply is not None:
                 # builtins may return plain text or (text, inline keyboard)
                 if isinstance(reply, tuple):
@@ -653,19 +801,23 @@ def main():
                     send(token, chat_id, reply)
                 continue
 
-            # A silent multi-minute gap reads as broken.
+            # A silent multi-minute gap reads as broken; typing covers the
+            # in-app view, "on it…" covers the lock screen.
             send(token, chat_id, "on it…")
             started = time.time()
+            model_override, clean = route_model(text)
             context = transcript_context()
-            prompt = text if not context else (
+            prompt = clean if not context else (
                 "Recent Telegram exchanges with Ruben (continue this "
                 "conversation naturally — 'it'/'that' likely refer to it):\n"
-                "%s\n\nRuben's new message:\n%s" % (context, text))
-            reply = run_claude(prompt)
-            transcript_append(text, reply)
-            audit("done in %.1fs, %d chars%s"
+                "%s\n\nRuben's new message:\n%s" % (context, clean))
+            with Typing(token, chat_id):
+                reply = run_claude(prompt, model=model_override)
+            transcript_append(clean, reply)
+            audit("done in %.1fs, %d chars%s%s"
                   % (time.time() - started, len(reply),
-                     ", with context" if context else ""))
+                     ", with context" if context else "",
+                     ", model=%s" % model_override if model_override else ""))
             send(token, chat_id, reply)
 
 

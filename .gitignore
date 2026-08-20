@@ -7,3 +7,4 @@ state/
 external/
 .playwright-mcp/
 __pycache__/
+models/

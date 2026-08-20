@@ -185,7 +185,13 @@ all). `done` on a promise closes it in Tana; on a person it stamps Last
 interaction. Anything else is passed to `claude -p` **with conversation
 continuity**: freeform exchanges accumulate in `state/bridge-transcript.json`
 (last 8, reset after 30 idle minutes or `reset`) so follow-ups like "actually
-make it Friday" have context.
+make it Friday" have context. Conversational surface: a typing indicator
+runs while work is in flight; `!deep`/`!think` routes one message to a
+bigger model and `!fast`/`!quick` to a cheap one (defaults sonnet /
+`NAO_BRIDGE_DEEP_MODEL` opus / `NAO_BRIDGE_FAST_MODEL` haiku); **voice
+notes are transcribed locally** (whisper.cpp, setup in `docs/voice-setup.md`),
+echoed back as "🎤 <transcript>", then handled as typed text — audio never
+leaves the mini and is deleted after transcription.
 
 **Security — do not weaken.** The bridge executes text arriving from the
 internet on a machine holding Tana, Monarch auth, `.env`, and SSH keys. The
