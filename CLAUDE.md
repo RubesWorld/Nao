@@ -137,9 +137,9 @@ jobs via `run-task.sh`. Retired plists live in `launchd-archive/` rather than
 being deleted (`listing-monitor`, move complete; `promise-deadline-monitor`,
 superseded by the watcher).
 
-## The ambient layer — watcher + bridge + relay
+## The ambient layer — watcher + bridge + relay + calendar capture
 
-Three components that are NOT prompt jobs. None goes through `run-task.sh`.
+Four components that are NOT prompt jobs. None goes through `run-task.sh`.
 
 **`com.nao.watcher`** — hourly, `scripts/watcher.py`. Silent unless a condition
 trips. This is the difference from every prompt job: it keeps state in
@@ -208,7 +208,47 @@ to know before touching it:
 Ruben's iMessage identity is his **Apple ID email**, not his phone number —
 see the fact node. Relay chats are keyed to the email.
 
-To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge,bluebubbles}.plist`
+**`com.nao.calendar-capture`** — nightly at 21:30, `scripts/calendar-capture.py`.
+Turns the Google Calendar into Tana's episodic memory. Same split as the
+watcher: `claude -p` classifies (`prompts/calendar-propose.md`, read-only,
+JSON out), Python owns state and numbering. It **proposes and never writes** —
+a calendar entry is a plan, and plans get cancelled, so logging a dinner that
+never happened would quietly poison the Sunday relationship review. Ruben
+confirms over Telegram (`log all` / `log 1,3` / `no`), and the bridge's
+`execute_calendar` applies it via `prompts/calendar-log.md`.
+
+Reads the primary and Family calendars only; Skincare Morning/Evening and the
+savings challenge are habit routines and are excluded everywhere. Looks back
+3 days for hangouts (only events that have already **ended**) and forward 60
+days for trips. Interactions land on the daily note for the day they happened;
+trips land beside the existing ones under the home node.
+
+State is `state/calendar-seen.json`, keyed by Google Calendar event id — that
+is what stops the same hangout being proposed nightly forever. An item aired
+twice with no answer is **retired**, not re-sent; `no` marks it skipped so it
+never returns. Same reasoning as the watcher's ladder: notification fatigue
+is the failure mode, and it arrives by accumulation.
+
+Two things learned building it, both worth not rediscovering:
+
+- **Names live in event titles, not attendee lists.** Ruben creates nearly all
+  his own events, so the only attendee is him. `Dinner w Chloe` has no Chloe
+  attached. Extraction is title-driven, which is also why the `calendar` skill
+  insists on putting the person's name in the title.
+- **Google's all-day `end.date` is exclusive.** A block returned as
+  `Aug 21 → Aug 24` is a trip ending the **23rd**. Off-by-one here stretches
+  every trip by a day.
+
+Google Calendar MCP **is** reachable from headless `claude -p` under launchd
+(verified 2026-08-19). A note in `prompts/morning-briefing.md` claimed the
+opposite for months and suppressed this whole idea; the briefing still ignores
+the calendar, but now by choice rather than by a false belief.
+
+Writing to the calendar is the `calendar` skill (`skills/calendar/SKILL.md`) —
+one sentence to a real event. It confirms before anything that reaches other
+people (attendees send real invites) or overwrites an existing event.
+
+To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge,bluebubbles,calendar-capture}.plist`
 
 **To add a new scheduled task:**
 1. Write `~/Nao/prompts/<name>.md` following the morning-briefing pattern
