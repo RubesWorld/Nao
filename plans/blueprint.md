@@ -178,11 +178,12 @@ Rough priority order:
    **same toolset as the local server including reads** (search_nodes,
    read_node, get_children, schemas, plus all mutations). Beta, paid plan.
    This ends the localhost constraint *for interactive surfaces*:
-   - **Do now (once on a paid plan):** add it as a claude.ai custom
-     connector → the Claude mobile app, Cowork cloud sessions, and Claude
-     Code web sessions can all reach Nao's memory. This is the real "talk
-     to Nao from anywhere" surface; the Telegram bridge stays for watcher
-     alerts, buttons, and push.
+   - **Do now (paid plan confirmed 2026-08-20):** add it as a claude.ai
+     custom connector (Settings → Connectors → Add custom connector →
+     `https://app.tana.inc/mcp`, complete OAuth) → the Claude mobile app,
+     Cowork cloud sessions, and Claude Code web sessions can all reach
+     Nao's memory. This is the real "talk to Nao from anywhere" surface;
+     the Telegram bridge stays for watcher alerts, buttons, and push.
    - **Don't do yet: migrate the heartbeat.** The launchd jobs stay on the
      local server — it's free, fast, private, and the mini is still bound
      there anyway by Monarch keyring auth, whisper, and launchd itself.
