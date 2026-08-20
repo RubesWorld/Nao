@@ -171,7 +171,15 @@ Rough priority order:
 7. **Passive interaction capture** — propose #interaction nodes from
    calendar events with attendees (needs #1's calendar habit first);
    propose-confirm via the cleanup-style flow, never silent writes.
-8. Future extensions still parked: Gmail triage in the morning briefing,
+8. **Cloud capture via Tana Input API** — Tana's Input API is cloud-reachable
+   (token auth) but WRITE-ONLY: create nodes, limited edits, 1 req/s,
+   100 nodes/call, 5KB payloads, no reads (checked 2026-08-20; cloud reads
+   are "on Tana's roadmap"). Usable today for capture-from-anywhere without
+   the mini in the loop (cloud sessions pushing tagged nodes to the inbox).
+   **Watch item: the day Tana ships cloud READS, re-evaluate the entire
+   localhost constraint** — it would unlock cloud scheduled tasks and
+   Claude-mobile access to Nao's memory.
+9. Future extensions still parked: Gmail triage in the morning briefing,
    GitHub Actions cloud layer for non-Tana tasks, Govee signals, voice
    memo pipeline, #prospect BD layer.
 
