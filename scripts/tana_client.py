@@ -19,11 +19,33 @@ Probe it by hand to see real response shapes:
 """
 
 import json
+import os
 import sys
 import urllib.request
 
 DEFAULT_URL = "http://127.0.0.1:8262/mcp"
 PROTOCOL_VERSION = "2025-03-26"
+CLAUDE_CONFIG = os.path.expanduser("~/.claude.json")
+
+
+def _auth_header():
+    """tana-local rejects unauthenticated calls with a 401.
+
+    The token is read from ~/.claude.json rather than copied into .env,
+    because that is where Claude Code already keeps it — one copy, and a
+    rotation there takes effect here with nothing to remember. Returns None
+    if it cannot be found, which surfaces as the same 401 the watcher
+    already falls back from rather than a crash.
+    """
+    override = os.environ.get("NAO_TANA_AUTH")
+    if override:
+        return override
+    try:
+        with open(CLAUDE_CONFIG) as f:
+            servers = json.load(f).get("mcpServers", {})
+    except (IOError, ValueError):
+        return None
+    return servers.get("tana-local", {}).get("headers", {}).get("Authorization")
 
 
 class TanaClient:
@@ -31,6 +53,7 @@ class TanaClient:
         self.url = url
         self.timeout = timeout
         self.session_id = None
+        self.auth = _auth_header()
         self._next_id = 0
         self._initialized = False
 
@@ -41,6 +64,8 @@ class TanaClient:
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
         }
+        if self.auth:
+            headers["Authorization"] = self.auth
         if self.session_id:
             headers["Mcp-Session-Id"] = self.session_id
         req = urllib.request.Request(
