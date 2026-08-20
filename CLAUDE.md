@@ -206,10 +206,14 @@ internet on a machine holding Tana, Monarch auth, `.env`, and SSH keys. The
 `TELEGRAM_CHAT_ID` allowlist is the primary boundary: a bot token is a bearer
 credential, so anyone holding it can message the bot. Non-allowlisted senders
 are logged and get **no reply** — a reply confirms the bot is live. Freeform
-commands run with an explicit tool allowlist (Tana, Monarch, Read,
-`Bash(date:*)` — override via `NAO_BRIDGE_TOOLS` in .env, `*` restores
-skip-permissions and should stay a temporary debugging state), never blanket
-`--dangerously-skip-permissions`. Every command is audited to
+commands run with an explicit tool allowlist (Tana, Monarch, Read, web
+search/fetch, `date`, and Nao's own scripts — watcher, health-check — by
+explicit command; override via `NAO_BRIDGE_TOOLS` in .env,
+`*` restores skip-permissions and should stay a temporary debugging state),
+never blanket `--dangerously-skip-permissions`. **The invariant: a leaked
+bot token must never equal a shell** — no arbitrary Bash, no Write/Edit
+(Nao never modifies its own code over an internet channel), nothing that
+reads `.env` or keys. Widen within that line; never across it. Every command is audited to
 `logs/telegram-bridge.log`, rate limited to 30/hr, and the update offset is
 persisted *before* execution so a crash loses a command rather than
 replaying it.

@@ -66,11 +66,24 @@ TRANSCRIPT_REPLY_CHARS = 1500   # stored reply excerpt; full reply still sent
 # the bridge legitimately does goes through these tools. Override with
 # NAO_BRIDGE_TOOLS (comma-separated) in .env; set it to * to restore the
 # old skip-permissions behavior if the allowlist ever blocks something.
+# The invariant this list defends: a leaked bot token must never equal a
+# shell on the mini. No arbitrary Bash, no Write/Edit (Nao never modifies
+# its own code over an internet channel), nothing that reads .env or keys.
+# Within that line, capability is negotiable — widened 2026-08-20 by
+# Ruben's call so the deployed allowlist never feels tight.
 DEFAULT_ALLOWED_TOOLS = [
     "mcp__tana-local",      # all Tana tools — read AND write, Nao's memory
     "mcp__monarch-money",   # finance questions
     "Read",
-    "Bash(date:*)",         # prompts need today's date, nothing more
+    "Bash(date:*)",         # prompts need today's date
+    "WebSearch",            # "look up X" from the phone
+    "WebFetch",             # read a link Ruben sends
+    # Nao's own repo-authored scripts, by explicit command — both the
+    # cwd-relative and ~ forms, since Bash rules match the literal text:
+    "Bash(python3 scripts/watcher.py:*)",
+    "Bash(python3 ~/Nao/scripts/watcher.py:*)",
+    "Bash(python3 scripts/health-check.py:*)",
+    "Bash(python3 ~/Nao/scripts/health-check.py:*)",
 ]
 
 # Model routing: explicit prefixes only — deterministic, no surprise bills.
