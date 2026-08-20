@@ -49,7 +49,7 @@ Get today's daily note. Tag `#[[^IRxH3qTXUQLe]]`. Fields:
 - Cash flow note (`EsW_mDpc7Xr1`): net flow — income vs expenses, progress on financial-goals
 - Date (`evzVkMOAhfoP`): today
 
-# Step 8: Telegram (stdout)
+# Step 7: Telegram (stdout)
 
 ```
 🗓️ Week: $612 (down 12%). Dining $245 over weekly target. Net +$140.

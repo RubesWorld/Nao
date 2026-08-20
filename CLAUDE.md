@@ -116,8 +116,12 @@ Nao's autonomous heartbeat runs as launchd jobs (NOT Cowork `/schedule`, since r
 ```
 ~/Nao/
 ├── scripts/run-task.sh        # Generic wrapper — sets PATH, logs, runs claude CLI
+├── scripts/nao_telegram.py    # THE Telegram sender (chunking, buttons) — never add another
+├── scripts/tana_client.py     # Direct HTTP client for the tana-local MCP (no LLM)
+├── scripts/health-check.py    # Weekly: did every job actually run? (deterministic)
 ├── prompts/<task-name>.md     # One markdown file per scheduled task
 ├── briefings/                 # Output cache (auto-named YYYY-MM-DD-<task>.md)
+├── launchd/                   # Plist templates tracked in git
 └── logs/tasks.log             # Unified log
 ```
 
@@ -125,17 +129,31 @@ Nao's autonomous heartbeat runs as launchd jobs (NOT Cowork `/schedule`, since r
 
 **Key conventions:**
 - Default model is **haiku** for routine tasks (cheap, fast, plenty smart for summarization)
-- Prompts must be **idempotent** — search Tana for existing nodes before writing to avoid duplicates
+- **Idempotency is layered**: run-task.sh skips a task whose briefing file already exists for today (`NAO_FORCE=1` overrides); the in-prompt Tana search is the second layer
+- run-task.sh enforces a timeout (900s default, needs `brew install coreutils` for gtimeout) and **pings Telegram on failure** — a silent failure is indistinguishable from a quiet day, so it never stays silent
+- All Telegram sends go through `scripts/nao_telegram.py` — it chunks by characters (byte truncation used to corrupt emoji and Telegram rejects invalid UTF-8)
 - Prompts must use **tag IDs and field IDs** (`#[[^4utYKeS9qOH-]]` not `#session-digest`) to avoid name resolution issues
 - Prompts should **skip empty sections** — no "no items" filler text. Quiet by default.
 - Final stdout is one line confirming what was written and where (node ID + count)
 
+**Calendar of record is Google Calendar (nycrar@gmail.com).** The Google
+Calendar MCP **is** reachable from headless `claude -p` under launchd
+(verified 2026-08-19), so no CLI shim or second OAuth token is needed — read
+it through the MCP. An earlier note claiming headless runs had no calendar
+access was simply wrong, and it suppressed every calendar feature for months.
+
+The morning briefing still does not read the calendar. That is a scope
+choice, not a limitation.
+
 **Active tasks:** `morning-briefing`, `end-of-day-digest`, `weekly-review`,
 `relationship-review`, `mid-week-budget-check`, `payday-allocation-check`,
 `weekly-spending-digest`, `monthly-financial-closeout` — all `claude -p` prompt
-jobs via `run-task.sh`. Retired plists live in `launchd-archive/` rather than
-being deleted (`listing-monitor`, move complete; `promise-deadline-monitor`,
-superseded by the watcher).
+jobs via `run-task.sh` — plus `health-check` (plain Python, Sunday 08:45,
+reads tasks.log + LaunchAgents and reports whether the machine itself is
+healthy; always sends, so the report doubles as a liveness signal). Retired
+plists live in `launchd-archive/` rather than being deleted
+(`listing-monitor`, move complete; `promise-deadline-monitor`, superseded by
+the watcher; `morning-briefing.sh`, pre-run-task.sh prototype).
 
 ## The ambient layer — watcher + bridge + relay + calendar capture
 
@@ -143,15 +161,22 @@ Four components that are NOT prompt jobs. None goes through `run-task.sh`.
 
 **`com.nao.watcher`** — hourly, `scripts/watcher.py`. Silent unless a condition
 trips. This is the difference from every prompt job: it keeps state in
-`state/watcher.json`, so it escalates instead of repeating. Ladder is
-1st plain → 2nd "still open" → 3rd offers an out → 4th auto-snoozes 7 days;
-never twice in one day. When a tracked item resolves it says so once, then
-forgets. Retrieval runs through `claude -p` (needs MCP for Tana) via
-`prompts/watcher-collect.md`, which returns JSON only — **all state and
-escalation logic is deterministic Python, deliberately no LLM in that path.**
-Watches promise deadlines and BlueBubbles relay health. Add conditions one at a
-time; the failure mode of this whole idea is notification fatigue, and it
-arrives by accumulation.
+`state/watcher.json` (keyed by node id — the condition lives inside the
+entry, so due-soon → overdue keeps its history), and it escalates instead of
+repeating. Ladder is 1st plain → 2nd "still open" → 3rd offers an out → 4th
+auto-snoozes 7 days; never twice in one day. When a tracked item resolves it
+says so once, then forgets. Retrieval is **deterministic first**: direct HTTP
+to the tana-local MCP via `scripts/tana_client.py`, falling back to `claude -p`
+(`prompts/watcher-collect.md`, JSON only) if parsing fails — check tasks.log
+for which path ran. **All state and escalation logic is deterministic Python,
+deliberately no LLM in that path.** Watches promise deadlines, BlueBubbles relay health, and person
+cadence (`person_cadence_overdue` — Person data cached ~20h in
+`state/watcher-people-cache.json`, not re-read hourly). Alerts carry
+per-item buttons; `drop` sets a persistent flag (staying quiet until the
+condition resolves) rather than forgetting and re-alerting. If the collector
+fails 3 runs straight, the watcher says so on Telegram once instead of going
+silently blind. Add conditions one at a time; the failure mode of this whole
+idea is notification fatigue, and it arrives by accumulation.
 
 The relay check is deliberately kept *outside* the promise state machine —
 its counter lives in `state/relay.json`, not `state/watcher.json`. The
@@ -166,17 +191,33 @@ outage cannot also silence the relay alarm.
 
 **`com.nao.telegram-bridge`** — persistent daemon, `scripts/telegram-bridge.py`.
 Inbound commands via `getUpdates` long polling, so no public URL or tunnel and
-nothing is exposed. `snooze 7d` / `done` / `drop` / `status` are handled
-directly against the watcher state; anything else is passed to `claude -p`.
+nothing is exposed. `snooze 7d [n]` / `done [n]` / `drop [n]` / `status` are
+handled directly against the watcher state (n = item number from the last
+alert; a bare `done` on a multi-item alert asks which rather than clearing
+all). `done` on a promise closes it in Tana; on a person it stamps Last
+interaction. Anything else is passed to `claude -p` **with conversation
+continuity**: freeform exchanges accumulate in `state/bridge-transcript.json`
+(last 8, reset after 30 idle minutes or `reset`) so follow-ups like "actually
+make it Friday" have context. Conversational surface: a typing indicator
+runs while work is in flight; `!deep`/`!think` routes one message to a
+bigger model and `!fast`/`!quick` to a cheap one (defaults sonnet /
+`NAO_BRIDGE_DEEP_MODEL` opus / `NAO_BRIDGE_FAST_MODEL` haiku); **voice
+notes are transcribed locally** (whisper.cpp, setup in `docs/voice-setup.md`),
+echoed back as "🎤 <transcript>", then handled as typed text — audio never
+leaves the mini and is deleted after transcription.
 
 **Security — do not weaken.** The bridge executes text arriving from the
 internet on a machine holding Tana, Monarch auth, `.env`, and SSH keys. The
-`TELEGRAM_CHAT_ID` allowlist is the entire boundary: a bot token is a bearer
+`TELEGRAM_CHAT_ID` allowlist is the primary boundary: a bot token is a bearer
 credential, so anyone holding it can message the bot. Non-allowlisted senders
-are logged and get **no reply** — a reply confirms the bot is live. Every
-command is audited to `logs/telegram-bridge.log`, rate limited to 30/hr, and
-the update offset is persisted *before* execution so a crash loses a command
-rather than replaying it.
+are logged and get **no reply** — a reply confirms the bot is live. Freeform
+commands run with an explicit tool allowlist (Tana, Monarch, Read,
+`Bash(date:*)` — override via `NAO_BRIDGE_TOOLS` in .env, `*` restores
+skip-permissions and should stay a temporary debugging state), never blanket
+`--dangerously-skip-permissions`. Every command is audited to
+`logs/telegram-bridge.log`, rate limited to 30/hr, and the update offset is
+persisted *before* execution so a crash loses a command rather than
+replaying it.
 
 **`com.nao.bluebubbles`** — keeps the iMessage relay alive.
 `scripts/bluebubbles-autostart.sh`, `RunAtLoad` plus a 5-minute

@@ -51,7 +51,7 @@ Then write a #budget-pulse to today's daily note. Tag `#[[^IRxH3qTXUQLe]]`. Fiel
 - Cash flow note (`EsW_mDpc7Xr1`): full narrative — what trends emerged, which goals advanced, which need attention
 - Date (`evzVkMOAhfoP`): today
 
-# Step 8: Telegram (stdout)
+# Step 7: Telegram (stdout)
 
 ```
 📅 May close-out: $4,820 spent (5% over target). Net -$280. Savings rate -6%. Top hits: Coachella $1,200, dining $812.

@@ -6,3 +6,5 @@ state/
 .DS_Store
 external/
 .playwright-mcp/
+__pycache__/
+models/

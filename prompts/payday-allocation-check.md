@@ -42,7 +42,7 @@ Get today's daily note. Tag `#[[^IRxH3qTXUQLe]]`. Fields:
 - Cash flow note (`EsW_mDpc7Xr1`): Paycheck confirmation — "Landed $X on <date>" or "Not yet landed — typically arrives by <day>"
 - Date (`evzVkMOAhfoP`): TODAY
 
-# Step 7: Telegram (stdout)
+# Step 6: Telegram (stdout)
 
 ```
 💸 Payday: $4,200 landed. Checking $3,840. Suggested: $500 → Emergency Fund (8% to $5K goal).

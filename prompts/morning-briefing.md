@@ -52,16 +52,16 @@ Body of the briefing (as children under the digest node):
 
 Keep the whole briefing under 30 lines. If a section is empty, omit it entirely. Do not invent data — if something isn't in Tana, don't include it.
 
-# Step 5: Final output to stdout (Telegram push)
+# Step 4: Final output to stdout (Telegram push)
 
-After writing to Tana and Slack, print a short readable summary to stdout. The runner sends this verbatim to Telegram, which means it should answer "what do I need to know in 5 seconds?" — readable on a watch.
+After writing to Tana, print a short readable summary to stdout. The runner sends this verbatim to Telegram, which means it should answer "what do I need to know in 5 seconds?" — readable on a watch.
 
 Format: 2-4 short lines. Use line breaks, not bullets. Lead with the most time-sensitive thing. Examples:
 
 ```
+📅 10:00 dentist, 15:30 call w/ Marty
 ⚠️ Send TRP info to Marty (due tomorrow)
 👋 Reach out: Mitchell (overdue 2 weeks)
-💤 2 stale projects (Sewing Class, Spain Trip)
 ```
 
 ```
