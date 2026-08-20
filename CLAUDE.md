@@ -137,10 +137,9 @@ jobs via `run-task.sh`. Retired plists live in `launchd-archive/` rather than
 being deleted (`listing-monitor`, move complete; `promise-deadline-monitor`,
 superseded by the watcher).
 
-## The ambient layer — watcher + bridge
+## The ambient layer — watcher + bridge + relay
 
-Two components that are NOT prompt jobs. Both are Python, both are stateful,
-and neither goes through `run-task.sh`.
+Three components that are NOT prompt jobs. None goes through `run-task.sh`.
 
 **`com.nao.watcher`** — hourly, `scripts/watcher.py`. Silent unless a condition
 trips. This is the difference from every prompt job: it keeps state in
@@ -150,8 +149,20 @@ never twice in one day. When a tracked item resolves it says so once, then
 forgets. Retrieval runs through `claude -p` (needs MCP for Tana) via
 `prompts/watcher-collect.md`, which returns JSON only — **all state and
 escalation logic is deterministic Python, deliberately no LLM in that path.**
-Currently watches promise deadlines. Add conditions one at a time; the failure
-mode of this whole idea is notification fatigue, and it arrives by accumulation.
+Watches promise deadlines and BlueBubbles relay health. Add conditions one at a
+time; the failure mode of this whole idea is notification fatigue, and it
+arrives by accumulation.
+
+The relay check is deliberately kept *outside* the promise state machine —
+its counter lives in `state/relay.json`, not `state/watcher.json`. The
+snooze/done/drop ladder is promise-shaped and reads wrong for an outage, and
+sharing that dict would let a relay bug corrupt promise bookkeeping. It alerts
+only after **two consecutive** hourly failures (one blip is noise), at most
+once a day, and says so once when the relay recovers. It probes over Tailscale
+rather than localhost on purpose — that is the path the phone uses, so a
+healthy server behind a dead tailnet still counts as down, and the message
+names which of the two broke. It runs *before* the collector so a Tana/MCP
+outage cannot also silence the relay alarm.
 
 **`com.nao.telegram-bridge`** — persistent daemon, `scripts/telegram-bridge.py`.
 Inbound commands via `getUpdates` long polling, so no public URL or tunnel and
@@ -167,7 +178,37 @@ command is audited to `logs/telegram-bridge.log`, rate limited to 30/hr, and
 the update offset is persisted *before* execution so a crash loses a command
 rather than replaying it.
 
-To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge}.plist`
+**`com.nao.bluebubbles`** — keeps the iMessage relay alive.
+`scripts/bluebubbles-autostart.sh`, `RunAtLoad` plus a 5-minute
+`StartInterval`. Not `KeepAlive`: `open -a` returns as soon as the app is
+handed to LaunchServices, which launchd would read as a crash and relaunch in
+a throttled loop forever — so the script polls for the process instead. Logs
+only when it actually restarts something.
+
+The relay itself is **BlueBubbles Server 1.9.9, patched**, reachable only over
+Tailscale at `100.118.35.80:1234`; Ruben's Android connects there. Two things
+to know before touching it:
+
+- **macOS 26 broke upstream BlueBubbles and it is dormant** (last real release
+  May 2025). Tahoe changed chat GUIDs from `iMessage;-;` to `any;-;`, so the
+  generated AppleScript said `service type = any` — not a valid constant — and
+  **every send failed with error -1700** (upstream issue 777). The fix is a
+  one-line service normalization applied to the bundled JS, kept in
+  `~/src/bluebubbles-tahoe-patch/patch-main.py`. It is idempotent and refuses
+  to patch a bundle it does not recognize. **Re-run it after any BlueBubbles
+  update** — an update silently reinstates the bug and sends start failing
+  with no obvious cause. The app runs from an unpacked `Resources/app/`
+  directory rather than `app.asar`, ad-hoc signed, so TCC permissions are
+  bound to that signature: re-signing means re-granting Full Disk Access.
+- **Private API is deliberately off.** It is broken on macOS 26 (issue 776 —
+  the helper dylib crashes Messages on injection), and enabling it would mean
+  disabling SIP on this machine. Cost: no sending tapbacks, typing indicators,
+  or edit/unsend. Revisit only if 776 closes.
+
+Ruben's iMessage identity is his **Apple ID email**, not his phone number —
+see the fact node. Relay chats are keyed to the email.
+
+To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge,bluebubbles}.plist`
 
 **To add a new scheduled task:**
 1. Write `~/Nao/prompts/<name>.md` following the morning-briefing pattern
