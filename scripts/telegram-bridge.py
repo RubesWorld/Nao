@@ -43,6 +43,9 @@ LAST_BATCH = os.path.join(STATE_DIR, "watcher-lastbatch.json")
 PENDING = os.path.join(STATE_DIR, "cleanup-pending.json")
 PROPOSE_PROMPT = os.path.join(NAO, "prompts", "cleanup-propose.md")
 EXECUTE_PROMPT = os.path.join(NAO, "prompts", "cleanup-execute.md")
+CAL_PENDING = os.path.join(STATE_DIR, "calendar-pending.json")
+CAL_SEEN = os.path.join(STATE_DIR, "calendar-seen.json")
+CAL_LOG_PROMPT = os.path.join(NAO, "prompts", "calendar-log.md")
 LOCK_PATH = os.path.join(STATE_DIR, "telegram-bridge.lock")
 AUDIT_LOG = os.path.join(NAO, "logs", "telegram-bridge.log")
 
@@ -260,6 +263,12 @@ def callback_to_command(data):
     if data.startswith("c:"):
         n = data[2:]
         return "do %s" % n if n.isdigit() else None
+    if data == "cal:all":
+        return "log all"
+    if data == "cal:no":
+        # Deliberately not the bare `no` command: tapping Skip on a calendar
+        # proposal must not also discard an unrelated pending cleanup.
+        return "log no"
     return None
 
 
@@ -360,6 +369,77 @@ def execute_cleanup(selection):
     return result or "(no output)"
 
 
+def execute_calendar(selection):
+    """Confirm calendar proposals from scripts/calendar-capture.py.
+
+    The proposer writes; this applies. Nothing reaches Tana until Ruben has
+    picked, which is the whole point — a calendar entry is a plan, and plans
+    get cancelled.
+    """
+    sel = selection.strip().lower()
+    pending = read_json(CAL_PENDING, {}).get("items") or []
+    if not pending:
+        return "No calendar proposals waiting."
+
+    seen = read_json(CAL_SEEN, {})
+    now = datetime.now(timezone.utc).isoformat()
+
+    if sel in ("no", "none", "skip"):
+        # Declining is not the same as ignoring: mark these so they never
+        # come back, rather than letting the nightly run re-air them.
+        for item in pending:
+            eid = item.get("eventId")
+            if eid:
+                rec = seen.get(eid, {})
+                rec.update({"outcome": "skipped", "at": now,
+                            "title": item.get("title", "")})
+                seen[eid] = rec
+        write_json(CAL_SEEN, seen)
+        write_json(CAL_PENDING, {"items": [], "at": now})
+        return "Skipped %d — I won't raise them again." % len(pending)
+
+    if sel in ("all", "*", ""):
+        chosen = list(range(len(pending)))
+    else:
+        chosen = []
+        for part in re.split(r"[,\s]+", sel):
+            if not part:
+                continue
+            if not part.isdigit():
+                return "Couldn't read %r. Try `log 1,3`, `log all`, or `no`." % part
+            idx = int(part) - 1
+            if not 0 <= idx < len(pending):
+                return "No item %s — the list has %d." % (part, len(pending))
+            chosen.append(idx)
+    if not chosen:
+        return "Nothing selected."
+
+    picked = [pending[i] for i in sorted(set(chosen))]
+    with open(CAL_LOG_PROMPT) as f:
+        prompt = f.read()
+    prompt += "\n\n```json\n%s\n```\n" % json.dumps(picked, indent=2)
+
+    audit("CALENDAR LOG %d item(s): %s"
+          % (len(picked), ", ".join(p.get("title", "?") for p in picked)))
+    result = run_claude(prompt, model="sonnet")
+
+    for item in picked:
+        eid = item.get("eventId")
+        if eid:
+            rec = seen.get(eid, {})
+            rec.update({"outcome": "logged", "at": now,
+                        "title": item.get("title", "")})
+            seen[eid] = rec
+    write_json(CAL_SEEN, seen)
+
+    # Consume the proposal either way — stale numbering is how the wrong
+    # thing gets written on a second `log`. Anything not picked keeps its
+    # "pending" record, so the nightly run gives it one more airing before
+    # calendar-capture.py retires it.
+    write_json(CAL_PENDING, {"items": [], "at": now})
+    return result or "(no output)"
+
+
 def load_batch():
     """The last watcher alert. Older lastbatch files carried only keys;
     synthesize items so both formats work."""
@@ -399,6 +479,8 @@ def builtin(text):
                 "                — propose tidy-ups, changes nothing\n"
                 "  do 1,3 / do all / no\n"
                 "                — act on the last proposal\n"
+                "  log 1,3 / log all / no\n"
+                "                — log the calendar hangouts/trips proposed\n"
                 "anything else is passed to Nao:\n"
                 "  !deep …       — harder question, bigger model\n"
                 "  !fast …       — quick lookup, cheap model\n"
@@ -415,10 +497,25 @@ def builtin(text):
     if cmd == "do" or cmd.startswith("do "):
         return execute_cleanup(cmd[len("do"):].strip())
 
+    # Only claim `log` when what follows actually looks like a selection.
+    # "log my workout" is a request for Nao, not an answer to a proposal.
+    if cmd == "log" or cmd.startswith("log "):
+        arg = cmd[len("log"):].strip()
+        if re.fullmatch(r"(all|\*|no|none|skip|[\d,\s]*)", arg):
+            return execute_calendar(arg)
+
     if cmd in ("no", "cancel", "nevermind", "never mind"):
+        # A bare "no" may be answering either proposal, so clear both rather
+        # than guess. Declining everything pending is never the wrong reading
+        # of "no", and nothing here writes to Tana.
+        replies = []
         if read_json(PENDING, {}).get("items"):
             write_json(PENDING, {"items": []})
-            return "Discarded. Nothing changed."
+            replies.append("Discarded the cleanup proposal. Nothing changed.")
+        if read_json(CAL_PENDING, {}).get("items"):
+            replies.append(execute_calendar("no"))
+        if replies:
+            return "\n".join(replies)
         return None   # not answering a proposal — let Claude handle it
 
     if cmd == "status":
@@ -788,7 +885,8 @@ def main():
             # Most builtins are instant, but cleanup/do call Claude and can
             # take a minute. A silent gap reads as broken, so ack those too.
             lowered = text.strip().lower()
-            if lowered.startswith(("cleanup", "do ")) or lowered == "do":
+            if (lowered.startswith(("cleanup", "do ", "log "))
+                    or lowered in ("do", "log")):
                 send(token, chat_id, "on it…")
 
             with Typing(token, chat_id):
