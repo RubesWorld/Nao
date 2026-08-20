@@ -195,9 +195,29 @@ Rough priority order:
      compromised connected account = graph access.
    (The write-only Input API remains relevant only for tokened, non-OAuth
    automation; the hosted MCP supersedes it for everything interactive.)
-9. Future extensions still parked: Gmail triage in the morning briefing,
-   GitHub Actions cloud layer for non-Tana tasks, Govee signals, voice
-   memo pipeline, #prospect BD layer.
+9. **Nao HQ — artifact front end** (planned 2026-08-20; the long-standing
+   "no front end" gap). A claude.ai Artifact page declaring the `mcp`
+   runtime capability calls the viewer's connectors with their credentials
+   — so once the Tana hosted-MCP connector (item 8) is added, a private
+   dashboard page can read the graph LIVE: open promises sorted by
+   deadline with overdue flags, today's briefing, active projects + next
+   actions, latest #budget-pulse (the scheduled jobs are already the ETL —
+   no Monarch access needed from the page), people due for reach-out.
+   Build order:
+   1. Tana connector added on claude.ai (prerequisite, item 8)
+   2. Fresh Claude Code web session with the connector attached — observe
+      one real search_nodes/read_node round-trip (never ship guessed tool
+      shapes), then build + publish
+   3. v1 is READ-ONLY, deliberately — keeps sunk cost low while the
+      commit-to-Tana question is open; the rendering layer is
+      substrate-agnostic and only the thin data layer speaks Tana
+   4. v2 (only after living with v1): action buttons — mark promise Done,
+      snooze, quick capture via import_tana_paste
+   Constraint: a page declaring `mcp` cannot be shared publicly (it is a
+   viewer-consented credential grant) — correct for a personal cockpit.
+10. Future extensions still parked: Gmail triage in the morning briefing,
+    GitHub Actions cloud layer for non-Tana tasks, Govee signals, voice
+    memo pipeline, #prospect BD layer.
 
 ## 8. Decision log
 
@@ -212,3 +232,5 @@ Rough priority order:
 | 2026-08-20 | Sequential Thinking / Markdownify / Context7 MCPs formally rejected. VPS layer formally closed as obsoleted. Blueprint converted to this living document. |
 | 2026-08-20 | Bridge conversational upgrades shipped: typing indicator, local voice-note transcription, explicit model routing. OpenClaw-class framework swap reconfirmed as rejected — features get added to the bridge instead. |
 | 2026-08-20 | Tana's **hosted MCP server (beta)** confirmed from docs: `https://app.tana.inc/mcp`, OAuth, full local toolset **including reads**, no desktop app needed (beta, paid plan). Localhost constraint falls for interactive surfaces. Decision: adopt for claude.ai/mobile/Cowork as a connector; heartbeat stays on the local server until hosted leaves beta (see roadmap item 8). |
+| 2026-08-20 | **Nao HQ front end planned** (roadmap item 9): a claude.ai Artifact with the `mcp` runtime capability as a live dashboard over the hosted Tana connector. v1 read-only by design while the commit-to-Tana question stays open; scheduled jobs double as the ETL layer, so no Monarch access is needed from the page. |
+| 2026-08-20 | **Substrate question reopened, decision deferred.** Past Tana frustration largely = access friction (desktop-only, search-node pain), which the hosted MCP + connector + Nao HQ may remove. Experiment: live with the new access for 2–4 weeks, then decide. Keep-Tana signals: memory retrieval works through the new surfaces and direct-Tana visits stop feeling necessary. Leave-Tana signals: still fighting the tool with full access, or paying for features Nao alone uses. Every access path already goes through a thin tool layer (MCP tools, tana_client), so a future migration is tractable either way — no need to decide from old frustration. |
