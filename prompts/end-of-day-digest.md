@@ -68,9 +68,9 @@ Body sections (omit empty ones):
 
 If a category has zero items, omit that line. If everything is empty, write a single line: "Quiet day — no Tana activity."
 
-For the Slack and Telegram outputs (next steps), feel free to be concise and surface highlights. But the Tana digest itself must be complete — it's the persistent record.
+For the Telegram output (next step), feel free to be concise and surface highlights. But the Tana digest itself must be complete — it's the persistent record.
 
-# Step 6: Telegram push (stdout)
+# Step 5: Telegram push (stdout)
 
 Print 2-4 short readable lines. Lead with what was accomplished (positive frame), then unresolved. Examples:
 

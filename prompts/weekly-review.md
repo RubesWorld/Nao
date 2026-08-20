@@ -49,7 +49,7 @@ Body sections (omit empty ones):
 
 Keep under 50 lines. Be specific. No filler.
 
-# Step 6: Telegram (stdout)
+# Step 5: Telegram (stdout)
 
 Print 3-5 lines. Lead with most actionable. Examples:
 

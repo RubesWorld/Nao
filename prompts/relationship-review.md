@@ -67,7 +67,7 @@ Body sections (omit empty ones, list each person with full context block):
 
 Keep tight — under 60 lines total. List specific names. No "you should reach out more" lectures.
 
-# Step 8: Telegram (stdout)
+# Step 7: Telegram (stdout)
 
 Print 3-5 lines. Lead with concerning, then today's reach-out. Examples:
 
