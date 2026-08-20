@@ -173,14 +173,27 @@ Rough priority order:
 7. **Passive interaction capture** — propose #interaction nodes from
    calendar events with attendees (needs #1's calendar habit first);
    propose-confirm via the cleanup-style flow, never silent writes.
-8. **Cloud capture via Tana Input API** — Tana's Input API is cloud-reachable
-   (token auth) but WRITE-ONLY: create nodes, limited edits, 1 req/s,
-   100 nodes/call, 5KB payloads, no reads (checked 2026-08-20; cloud reads
-   are "on Tana's roadmap"). Usable today for capture-from-anywhere without
-   the mini in the loop (cloud sessions pushing tagged nodes to the inbox).
-   **Watch item: the day Tana ships cloud READS, re-evaluate the entire
-   localhost constraint** — it would unlock cloud scheduled tasks and
-   Claude-mobile access to Nao's memory.
+8. **Adopt Tana's hosted MCP (beta)** — confirmed 2026-08-20 from the docs:
+   `https://app.tana.inc/mcp`, HTTP + OAuth, no desktop app required,
+   **same toolset as the local server including reads** (search_nodes,
+   read_node, get_children, schemas, plus all mutations). Beta, paid plan.
+   This ends the localhost constraint *for interactive surfaces*:
+   - **Do now (once on a paid plan):** add it as a claude.ai custom
+     connector → the Claude mobile app, Cowork cloud sessions, and Claude
+     Code web sessions can all reach Nao's memory. This is the real "talk
+     to Nao from anywhere" surface; the Telegram bridge stays for watcher
+     alerts, buttons, and push.
+   - **Don't do yet: migrate the heartbeat.** The launchd jobs stay on the
+     local server — it's free, fast, private, and the mini is still bound
+     there anyway by Monarch keyring auth, whisper, and launchd itself.
+     Also: OAuth grants in headless cron contexts are fragile, and a beta
+     endpoint is the wrong foundation for the autonomous layer. Revisit
+     when the hosted server leaves beta.
+   - **Security:** the graph is now reachable from the internet through any
+     OAuth-granted client. Review and prune grants periodically; a
+     compromised connected account = graph access.
+   (The write-only Input API remains relevant only for tokened, non-OAuth
+   automation; the hosted MCP supersedes it for everything interactive.)
 9. Future extensions still parked: Gmail triage in the morning briefing,
    GitHub Actions cloud layer for non-Tana tasks, Govee signals, voice
    memo pipeline, #prospect BD layer.
@@ -197,4 +210,4 @@ Rough priority order:
 | 2026-08-20 | Hardening PR (#1): watcher state keyed by node id, per-item alert actions, persistent drop, local-time deadlines, deterministic HTTP retrieval with LLM fallback, bridge tool allowlist + transcript continuity, one Telegram sender, run-task timeout/skip/failure pings, weekly health-check, calendar wrapper (Google Calendar = calendar of record). |
 | 2026-08-20 | Sequential Thinking / Markdownify / Context7 MCPs formally rejected. VPS layer formally closed as obsoleted. Blueprint converted to this living document. |
 | 2026-08-20 | Bridge conversational upgrades shipped: typing indicator, local voice-note transcription, explicit model routing. OpenClaw-class framework swap reconfirmed as rejected — features get added to the bridge instead. |
-| 2026-08-20 | Tana announced a **hosted MCP server (beta)** (July 2026 newsletter, outliner.tana.inc/learn/features/local-api-mcp#hosted-mcp-server-beta). Capabilities under evaluation — if it supports reads, the localhost constraint falls; see roadmap item 8. |
+| 2026-08-20 | Tana's **hosted MCP server (beta)** confirmed from docs: `https://app.tana.inc/mcp`, OAuth, full local toolset **including reads**, no desktop app needed (beta, paid plan). Localhost constraint falls for interactive surfaces. Decision: adopt for claude.ai/mobile/Cowork as a connector; heartbeat stays on the local server until hosted leaves beta (see roadmap item 8). |
