@@ -60,9 +60,9 @@ After writing to Tana, print a short readable summary to stdout. The runner send
 Format: 2-4 short lines. Use line breaks, not bullets. Lead with the most time-sensitive thing. Examples:
 
 ```
-📅 10:00 dentist, 15:30 call w/ Marty
 ⚠️ Send TRP info to Marty (due tomorrow)
 👋 Reach out: Mitchell (overdue 2 weeks)
+💤 2 stale projects (Sewing Class, Spain Trip)
 ```
 
 ```
