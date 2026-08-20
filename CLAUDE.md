@@ -155,10 +155,9 @@ plists live in `launchd-archive/` rather than being deleted
 (`listing-monitor`, move complete; `promise-deadline-monitor`, superseded by
 the watcher; `morning-briefing.sh`, pre-run-task.sh prototype).
 
-## The ambient layer — watcher + bridge
+## The ambient layer — watcher + bridge + relay + calendar capture
 
-Two components that are NOT prompt jobs. Both are Python, both are stateful,
-and neither goes through `run-task.sh`.
+Four components that are NOT prompt jobs. None goes through `run-task.sh`.
 
 **`com.nao.watcher`** — hourly, `scripts/watcher.py`. Silent unless a condition
 trips. This is the difference from every prompt job: it keeps state in
@@ -170,7 +169,7 @@ says so once, then forgets. Retrieval is **deterministic first**: direct HTTP
 to the tana-local MCP via `scripts/tana_client.py`, falling back to `claude -p`
 (`prompts/watcher-collect.md`, JSON only) if parsing fails — check tasks.log
 for which path ran. **All state and escalation logic is deterministic Python,
-deliberately no LLM in that path.** Watches promise deadlines and person
+deliberately no LLM in that path.** Watches promise deadlines, BlueBubbles relay health, and person
 cadence (`person_cadence_overdue` — Person data cached ~20h in
 `state/watcher-people-cache.json`, not re-read hourly). Alerts carry
 per-item buttons; `drop` sets a persistent flag (staying quiet until the
@@ -178,6 +177,17 @@ condition resolves) rather than forgetting and re-alerting. If the collector
 fails 3 runs straight, the watcher says so on Telegram once instead of going
 silently blind. Add conditions one at a time; the failure mode of this whole
 idea is notification fatigue, and it arrives by accumulation.
+
+The relay check is deliberately kept *outside* the promise state machine —
+its counter lives in `state/relay.json`, not `state/watcher.json`. The
+snooze/done/drop ladder is promise-shaped and reads wrong for an outage, and
+sharing that dict would let a relay bug corrupt promise bookkeeping. It alerts
+only after **two consecutive** hourly failures (one blip is noise), at most
+once a day, and says so once when the relay recovers. It probes over Tailscale
+rather than localhost on purpose — that is the path the phone uses, so a
+healthy server behind a dead tailnet still counts as down, and the message
+names which of the two broke. It runs *before* the collector so a Tana/MCP
+outage cannot also silence the relay alarm.
 
 **`com.nao.telegram-bridge`** — persistent daemon, `scripts/telegram-bridge.py`.
 Inbound commands via `getUpdates` long polling, so no public URL or tunnel and
@@ -218,7 +228,77 @@ reads `.env` or keys. Widen within that line; never across it. Every command is 
 persisted *before* execution so a crash loses a command rather than
 replaying it.
 
-To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge}.plist`
+**`com.nao.bluebubbles`** — keeps the iMessage relay alive.
+`scripts/bluebubbles-autostart.sh`, `RunAtLoad` plus a 5-minute
+`StartInterval`. Not `KeepAlive`: `open -a` returns as soon as the app is
+handed to LaunchServices, which launchd would read as a crash and relaunch in
+a throttled loop forever — so the script polls for the process instead. Logs
+only when it actually restarts something.
+
+The relay itself is **BlueBubbles Server 1.9.9, patched**, reachable only over
+Tailscale at `100.118.35.80:1234`; Ruben's Android connects there. Two things
+to know before touching it:
+
+- **macOS 26 broke upstream BlueBubbles and it is dormant** (last real release
+  May 2025). Tahoe changed chat GUIDs from `iMessage;-;` to `any;-;`, so the
+  generated AppleScript said `service type = any` — not a valid constant — and
+  **every send failed with error -1700** (upstream issue 777). The fix is a
+  one-line service normalization applied to the bundled JS, kept in
+  `~/src/bluebubbles-tahoe-patch/patch-main.py`. It is idempotent and refuses
+  to patch a bundle it does not recognize. **Re-run it after any BlueBubbles
+  update** — an update silently reinstates the bug and sends start failing
+  with no obvious cause. The app runs from an unpacked `Resources/app/`
+  directory rather than `app.asar`, ad-hoc signed, so TCC permissions are
+  bound to that signature: re-signing means re-granting Full Disk Access.
+- **Private API is deliberately off.** It is broken on macOS 26 (issue 776 —
+  the helper dylib crashes Messages on injection), and enabling it would mean
+  disabling SIP on this machine. Cost: no sending tapbacks, typing indicators,
+  or edit/unsend. Revisit only if 776 closes.
+
+Ruben's iMessage identity is his **Apple ID email**, not his phone number —
+see the fact node. Relay chats are keyed to the email.
+
+**`com.nao.calendar-capture`** — nightly at 21:30, `scripts/calendar-capture.py`.
+Turns the Google Calendar into Tana's episodic memory. Same split as the
+watcher: `claude -p` classifies (`prompts/calendar-propose.md`, read-only,
+JSON out), Python owns state and numbering. It **proposes and never writes** —
+a calendar entry is a plan, and plans get cancelled, so logging a dinner that
+never happened would quietly poison the Sunday relationship review. Ruben
+confirms over Telegram (`log all` / `log 1,3` / `no`), and the bridge's
+`execute_calendar` applies it via `prompts/calendar-log.md`.
+
+Reads the primary and Family calendars only; Skincare Morning/Evening and the
+savings challenge are habit routines and are excluded everywhere. Looks back
+3 days for hangouts (only events that have already **ended**) and forward 60
+days for trips. Interactions land on the daily note for the day they happened;
+trips land beside the existing ones under the home node.
+
+State is `state/calendar-seen.json`, keyed by Google Calendar event id — that
+is what stops the same hangout being proposed nightly forever. An item aired
+twice with no answer is **retired**, not re-sent; `no` marks it skipped so it
+never returns. Same reasoning as the watcher's ladder: notification fatigue
+is the failure mode, and it arrives by accumulation.
+
+Two things learned building it, both worth not rediscovering:
+
+- **Names live in event titles, not attendee lists.** Ruben creates nearly all
+  his own events, so the only attendee is him. `Dinner w Chloe` has no Chloe
+  attached. Extraction is title-driven, which is also why the `calendar` skill
+  insists on putting the person's name in the title.
+- **Google's all-day `end.date` is exclusive.** A block returned as
+  `Aug 21 → Aug 24` is a trip ending the **23rd**. Off-by-one here stretches
+  every trip by a day.
+
+Google Calendar MCP **is** reachable from headless `claude -p` under launchd
+(verified 2026-08-19). A note in `prompts/morning-briefing.md` claimed the
+opposite for months and suppressed this whole idea; the briefing still ignores
+the calendar, but now by choice rather than by a false belief.
+
+Writing to the calendar is the `calendar` skill (`skills/calendar/SKILL.md`) —
+one sentence to a real event. It confirms before anything that reaches other
+people (attendees send real invites) or overwrites an existing event.
+
+To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge,bluebubbles,calendar-capture}.plist`
 
 **To add a new scheduled task:**
 1. Write `~/Nao/prompts/<name>.md` following the morning-briefing pattern
