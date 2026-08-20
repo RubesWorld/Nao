@@ -27,7 +27,7 @@ import subprocess
 import sys
 import urllib.parse      # relay probe talks to BlueBubbles directly
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from nao_telegram import send as telegram_send  # noqa: E402
@@ -136,18 +136,81 @@ def save_state(state):
 # Collection — HTTP first, claude -p fallback
 # ---------------------------------------------------------------------------
 
+_MONTHS = {m: i for i, m in enumerate(
+    ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), 1)}
+
+
 def _first_date(value):
-    m = re.search(r"\d{4}-\d{2}-\d{2}", str(value or ""))
-    return m.group(0) if m else None
+    """Normalise a Tana date to YYYY-MM-DD.
+
+    read_node renders dates for humans, not parsers: a deadline comes back
+    as "Mon, Jun 1" — weekday, no year — and the year is printed only when
+    it is not the current one. Matching ISO alone silently returned None
+    here, and a promise with no parsed deadline can never go overdue, so
+    the whole condition quietly stopped firing on this path.
+
+    The weekday is what makes the missing year safe to resolve: try the
+    plausible years and keep the one whose weekday actually matches, so a
+    bad guess yields nothing rather than moving a deadline twelve months.
+    """
+    text = str(value or "")
+    m = re.search(r"\d{4}-\d{2}-\d{2}", text)
+    if m:
+        return m.group(0)
+
+    m = re.search(r"(?:(Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,\s*)?"
+                  r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*"
+                  r"\s+(\d{1,2})(?:,\s*(\d{4}))?", text)
+    if not m:
+        return None
+    weekday, month_name, day, year = m.groups()
+    month, day = _MONTHS[month_name], int(day)
+
+    if year:
+        try:
+            return date(int(year), month, day).isoformat()
+        except ValueError:
+            return None
+
+    this_year = date.today().year
+    for candidate in (this_year, this_year - 1, this_year + 1):
+        try:
+            d = date(candidate, month, day)
+        except ValueError:
+            continue
+        if not weekday or d.strftime("%a") == weekday:
+            return d.isoformat()
+    return None
+
+
+def _clean_field_value(raw):
+    """read_node decorates values for display: option fields arrive as
+    "[Open](tana:optionId)" and every line carries a trailing node-id HTML
+    comment. Strip both so callers can compare against plain text."""
+    v = re.sub(r"<!--.*?-->", "", raw)
+    v = re.sub(r"\[([^\]]*)\]\(tana:[^)]*\)", r"\1", v)
+    return v.strip()
+
+
+_ID_SKIP_KEYS = ("tags", "tagIds")
 
 
 def _walk_ids(obj, found):
-    """Collect {id, name} pairs from arbitrarily shaped parsed JSON."""
+    """Collect {id, name} pairs from arbitrarily shaped parsed JSON.
+
+    Deliberately does not descend into `tags`: each entry there carries the
+    supertag's own id, so walking it collected the #promise definition as
+    though it were a promise — one phantom item in every result set, and a
+    phantom Person handed to the cadence condition.
+    """
     if isinstance(obj, dict):
         node_id = obj.get("id") or obj.get("nodeId")
         if isinstance(node_id, str) and node_id:
             found[node_id] = obj.get("name") or obj.get("title") or ""
-        for v in obj.values():
+        for key, v in obj.items():
+            if key in _ID_SKIP_KEYS:
+                continue
             _walk_ids(v, found)
     elif isinstance(obj, list):
         for v in obj:
@@ -197,6 +260,12 @@ def _field_from_json(obj, label, field_id):
     return None
 
 
+def _looks_like_node(text):
+    """Is this recognisably read_node output, however empty?"""
+    t = (text or "").strip()
+    return bool(t) and ("<!-- node-id:" in t or t.startswith("-"))
+
+
 def _extract_fields(text, wanted):
     """Pull field values out of a read_node result.
 
@@ -223,13 +292,21 @@ def _extract_fields(text, wanted):
                 matched_any = True
     else:
         for key, (label, field_id) in wanted.items():
-            m = re.search(r"^\s*-?\s*%s\s*::\s*(.+)$" % re.escape(label),
-                          text or "", re.IGNORECASE | re.MULTILINE)
+            # read_node emits "**Label**: value"; older/plain outline text
+            # uses "Label:: value". Accept either.
+            m = re.search(
+                r"^\s*-?\s*(?:\*\*)?%s(?:\*\*)?\s*::?\s*(.+)$"
+                % re.escape(label), text or "", re.IGNORECASE | re.MULTILINE)
             if m:
-                out[key] = m.group(1).strip()
+                out[key] = _clean_field_value(m.group(1))
                 matched_any = True
 
-    if not matched_any:
+    # The raise exists to catch a changed response shape, not to reject a
+    # node that simply has these fields unset — and plenty do: a Person who
+    # has never had an interaction logged has neither Cadence nor Last
+    # interaction. Treating that as a shape change took the whole HTTP path
+    # down on every run, which is why it kept falling back to claude.
+    if not matched_any and not _looks_like_node(text):
         raise RuntimeError("no fields recognised in read_node output")
     return out
 
