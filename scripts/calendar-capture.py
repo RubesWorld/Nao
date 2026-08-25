@@ -37,6 +37,9 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 NAO = os.path.expanduser("~/Nao")
+sys.path.insert(0, os.path.join(NAO, "scripts"))
+
+import calendar_log  # noqa: E402
 SEEN_PATH = os.path.join(NAO, "state", "calendar-seen.json")
 PENDING_PATH = os.path.join(NAO, "state", "calendar-pending.json")
 LOG_PATH = os.path.join(NAO, "logs", "tasks.log")
@@ -106,29 +109,53 @@ def prune(seen):
     return kept
 
 
+def run_claude(prompt):
+    """Raises on failure; callers decide whether that is fatal."""
+    env = dict(os.environ)
+    env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+    proc = subprocess.run(
+        ["claude", "-p", "--model", MODEL, "--output-format", "text",
+         "--dangerously-skip-permissions"],
+        input=prompt, capture_output=True, text=True,
+        cwd=NAO, env=env, timeout=COLLECT_TIMEOUT,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError("claude exited %d: %s"
+                           % (proc.returncode, proc.stderr.strip()[:300]))
+    return proc.stdout
+
+
+def is_auto(item):
+    """Write this one straight to Tana, or ask first?
+
+    Booking-backed events carry someone else's record — a confirmation
+    email, a ticket, an invitation. Self-created ones are notes about a
+    plan, and a plan that quietly fell through looks identical to one that
+    happened, because the calendar never gets tidied afterwards.
+
+    An interaction with nobody resolved always asks, whatever the evidence:
+    the value of the node is who was there, and Attendees is the field the
+    relationship review actually reads.
+    """
+    if item.get("evidence") != "booking":
+        return False
+    if item.get("kind") == "trip":
+        return True
+    return any(p.get("id") for p in (item.get("people") or []))
+
+
 def collect():
     """Run the proposer. Returns a list, or None if the run failed."""
     with open(PROPOSE_PROMPT) as f:
         prompt = f.read()
-
-    env = dict(os.environ)
-    env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
     try:
-        proc = subprocess.run(
-            ["claude", "-p", "--model", MODEL, "--output-format", "text",
-             "--dangerously-skip-permissions"],
-            input=prompt, capture_output=True, text=True,
-            cwd=NAO, env=env, timeout=COLLECT_TIMEOUT,
-        )
+        out = run_claude(prompt).strip()
     except subprocess.TimeoutExpired:
         log("collector timed out after %ds" % COLLECT_TIMEOUT)
         return None
-    if proc.returncode != 0:
-        log("collector failed (exit %d): %s"
-            % (proc.returncode, proc.stderr.strip()[:300]))
+    except RuntimeError as e:
+        log("collector failed (%s)" % e)
         return None
-
-    out = proc.stdout.strip()
     match = re.search(r"\[.*\]", out, re.DOTALL)
     if not match:
         log("collector returned no JSON array: %r" % out[:300])
@@ -217,35 +244,75 @@ def main():
         return 0
 
     fresh = fresh[:MAX_ITEMS]
+    auto = [i for i in fresh if is_auto(i)]
+    ask = [i for i in fresh if not is_auto(i)]
 
-    for item in fresh:
+    # Write the booking-backed ones first. If this raises, nothing has been
+    # marked logged yet, so the next run simply tries again.
+    logged_text, receipts = "", []
+    if auto:
+        try:
+            logged_text, receipts = calendar_log.apply_items(auto, run_claude)
+        except Exception as e:
+            log("auto-log failed (%s) — falling back to asking" % e)
+            ask = fresh
+            auto, logged_text, receipts = [], "", []
+
+    written = {r.get("eventId") for r in receipts if r.get("nodeId")}
+    if receipts:
+        calendar_log.save_undo(
+            receipts, {i["eventId"]: i.get("title", "") for i in auto})
+
+    for item in auto:
         eid = item["eventId"]
-        record = seen.get(eid, {"proposals": 0})
-        record["proposals"] = record.get("proposals", 0) + 1
-        record["at"] = now
-        record["title"] = item.get("title", "")
-        record["outcome"] = "pending"
-        seen[eid] = record
+        rec = seen.get(eid, {})
+        # An item it wrote without asking did not consume a proposal — it is
+        # finished, not awaiting an answer.
+        rec.update({"outcome": "logged" if eid in written else "pending",
+                    "at": now, "title": item.get("title", "")})
+        rec.setdefault("proposals", 0)
+        seen[eid] = rec
 
-    write_json(PENDING_PATH, {"items": fresh, "at": now})
+    for item in ask:
+        eid = item["eventId"]
+        rec = seen.get(eid, {"proposals": 0})
+        rec["proposals"] = rec.get("proposals", 0) + 1
+        rec["at"] = now
+        rec["title"] = item.get("title", "")
+        rec["outcome"] = "pending"
+        seen[eid] = rec
+
+    write_json(PENDING_PATH, {"items": ask, "at": now})
     write_json(SEEN_PATH, seen)
 
-    lines = ["📅 From your calendar (nothing written yet):"]
-    for i, item in enumerate(fresh, 1):
-        lines.append("%d. %s" % (i, describe(item)))
-        if item.get("reason"):
-            lines.append("     %s" % item["reason"])
-    lines.append("")
-    lines.append("`log all` / `log 1,3` / `no`")
+    lines, rows = [], []
+    if logged_text:
+        lines.append("📅 Logged from your calendar:")
+        lines.append(logged_text)
+        rows.append([("↩︎ Undo all", "cal:undo")])
+    if ask:
+        if lines:
+            lines.append("")
+        lines.append("Asking about:" if logged_text
+                     else "📅 From your calendar (nothing written yet):")
+        for i, item in enumerate(ask, 1):
+            lines.append("%d. %s" % (i, describe(item)))
+            if item.get("reason"):
+                lines.append("     %s" % item["reason"])
+        lines.append("")
+        lines.append("`log all` / `log 1,3` / `no`")
+        rows.append([("Log all", "cal:all"), ("Skip", "cal:no")])
 
-    markup = json.dumps({"inline_keyboard": [[
-        {"text": "Log all", "callback_data": "cal:all"},
-        {"text": "Skip", "callback_data": "cal:no"},
-    ]]})
+    if not lines:
+        log("nothing to report")
+        return 0
 
+    markup = json.dumps({"inline_keyboard": [
+        [{"text": t, "callback_data": d} for t, d in row] for row in rows]})
     send("\n".join(lines), markup)
-    log("proposed %d item(s): %s"
-        % (len(fresh), ", ".join(i.get("title", "?") for i in fresh)))
+    log("logged %d, asked %d (%s)"
+        % (len(written), len(ask),
+           ", ".join(i.get("title", "?") for i in fresh)))
     return 0
 
 

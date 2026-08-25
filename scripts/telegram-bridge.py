@@ -33,6 +33,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from nao_telegram import send as tg_send  # noqa: E402
+import calendar_log                              # noqa: E402
 
 NAO = os.path.expanduser("~/Nao")
 STATE_DIR = os.path.join(NAO, "state")
@@ -280,6 +281,8 @@ def callback_to_command(data):
         return "do %s" % n if n.isdigit() else None
     if data == "cal:all":
         return "log all"
+    if data == "cal:undo":
+        return "undo"
     if data == "cal:no":
         # Deliberately not the bare `no` command: tapping Skip on a calendar
         # proposal must not also discard an unrelated pending cleanup.
@@ -473,17 +476,22 @@ def execute_calendar(selection):
         return "Nothing selected."
 
     picked = [pending[i] for i in sorted(set(chosen))]
-    with open(CAL_LOG_PROMPT) as f:
-        prompt = f.read()
-    prompt += "\n\n```json\n%s\n```\n" % json.dumps(picked, indent=2)
-
     audit("CALENDAR LOG %d item(s): %s"
           % (len(picked), ", ".join(p.get("title", "?") for p in picked)))
-    result = run_claude(prompt, model="sonnet")
 
+    result, receipts = calendar_log.apply_items(
+        picked, lambda text: run_claude(text, model="sonnet"))
+    if receipts:
+        calendar_log.save_undo(
+            receipts, {i.get("eventId"): i.get("title", "") for i in picked})
+        result = (result + "\n\nSend `undo` if any of that is wrong.").strip()
+
+    # Only what the receipt actually reports is finished; anything the write
+    # dropped stays pending so the next run can offer it again.
+    written = {r.get("eventId") for r in receipts if r.get("nodeId")}
     for item in picked:
         eid = item.get("eventId")
-        if eid:
+        if eid and eid in written:
             rec = seen.get(eid, {})
             rec.update({"outcome": "logged", "at": now,
                         "title": item.get("title", "")})
@@ -542,6 +550,7 @@ def builtin(text):
                 "                — act on the last proposal\n"
                 "  log 1,3 / log all / no\n"
                 "                — log the calendar hangouts/trips proposed\n"
+                "  undo / undo 1 — reverse the last calendar write\n"
                 "anything else is passed to Nao:\n"
                 "  !deep …       — harder question, bigger model\n"
                 "  !fast …       — quick lookup, cheap model\n"
@@ -563,6 +572,13 @@ def builtin(text):
 
     # Only claim `log` when what follows actually looks like a selection.
     # "log my workout" is a request for Nao, not an answer to a proposal.
+    # Same guard as `log`: only claim `undo` when what follows is a
+    # selector. "undo my last email" is a request for Nao, not for this.
+    if cmd == "undo" or cmd.startswith("undo "):
+        arg = cmd[len("undo"):].strip()
+        if re.fullmatch(r"(all|\*|[\d,\s]*)", arg):
+            return calendar_log.undo(arg)
+
     if cmd == "log" or cmd.startswith("log "):
         arg = cmd[len("log"):].strip()
         if re.fullmatch(r"(all|\*|no|none|skip|[\d,\s]*)", arg):
@@ -955,7 +971,7 @@ def main():
             # take a minute. A silent gap reads as broken, so ack those too.
             lowered = text.strip().lower()
             if (lowered.startswith(("cleanup", "triage", "do ", "log "))
-                    or lowered in ("do", "log")):
+                    or lowered in ("do", "log", "undo")):
                 send(token, chat_id, "on it…")
 
             with Typing(token, chat_id):

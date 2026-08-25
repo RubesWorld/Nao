@@ -71,6 +71,12 @@ quietly corrupts the "Concerning vibes" section of the Sunday review.
 
 ## 3. Update every attendee
 
+**Read each Person node first and note the existing Last interaction value.**
+It goes in the receipt below, and it is the only way an undo can put the
+right date back — clearing the field instead would look like someone never
+seen at all, which is a worse lie than the one being reversed. Record `null`
+if the field was genuinely empty.
+
 For each resolved Person node, `set_field_content`:
 
 - `nodeId`: the Person's node id
@@ -133,3 +139,25 @@ Say what you wrote and flag anything a human needs to finish:
 
 If an item fails, say so on its own line and keep going with the rest. One bad
 item must not take the batch down with it.
+
+## The receipt
+
+After the human-readable lines, print a single fenced ```json block: one
+object per item you actually wrote. The caller stores this so the write can
+be reversed later, and cannot reverse what you do not report.
+
+```json
+[{"eventId":"6hhm...","kind":"interaction","nodeId":"wfplZaRl5tGD",
+  "people":[{"id":"YpYQ-ZaBjI_T","priorLastInteraction":"2026-05-08",
+             "createdByThisLog":false}]},
+ {"eventId":"uoun...","kind":"trip","nodeId":"ooEx-Yhs3y4f","people":[]}]
+```
+
+- `nodeId` — the node you created. Without it nothing can be undone.
+- `priorLastInteraction` — the value that was there **before** you wrote,
+  `YYYY-MM-DD` or `null`
+- `createdByThisLog` — `true` only if you created that Person node in step 1,
+  so an undo knows to remove it rather than orphan an empty person
+- Omit any item that failed. The receipt records what happened, not what was
+  attempted.
+- The JSON block is the last thing you print, and nothing follows it.
