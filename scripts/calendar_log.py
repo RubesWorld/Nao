@@ -29,6 +29,8 @@ from datetime import datetime, timedelta, timezone
 NAO = os.path.expanduser("~/Nao")
 sys.path.insert(0, os.path.join(NAO, "scripts"))
 
+import nao_audit  # noqa: E402
+
 UNDO_PATH = os.path.join(NAO, "state", "calendar-undo.json")
 SEEN_PATH = os.path.join(NAO, "state", "calendar-seen.json")
 LOG_PROMPT = os.path.join(NAO, "prompts", "calendar-log.md")
@@ -80,12 +82,54 @@ def split_receipt(text):
     return human, receipts
 
 
-def apply_items(items, run_claude):
-    """Write items to Tana via calendar-log.md. Returns (human_text, receipts)."""
+def _why(item):
+    """The grounds for writing this one, in a phrase — the field that makes
+    the action log worth keeping."""
+    bits = ["%s-backed" % (item.get("evidence") or "unrated")]
+    people = [p for p in (item.get("people") or []) if p.get("id")]
+    if people:
+        bits.append("%s resolved" % ", ".join(p.get("name", "?") for p in people))
+    elif item.get("kind") == "interaction":
+        bits.append("nobody resolved")
+    if item.get("reason"):
+        bits.append(item["reason"])
+    return "; ".join(bits)
+
+
+def apply_items(items, run_claude, actor="bridge", auto=False):
+    """Write items to Tana via calendar-log.md. Returns (human_text, receipts).
+
+    Every write is recorded to the action log with the grounds for it, so a
+    change made without asking can be checked afterwards rather than taken on
+    trust.
+    """
     with open(LOG_PROMPT) as f:
         prompt = f.read()
     prompt += "\n\n```json\n%s\n```\n" % json.dumps(items, indent=2)
-    return split_receipt(run_claude(prompt))
+    human, receipts = split_receipt(run_claude(prompt))
+
+    by_event = {i.get("eventId"): i for i in items}
+    written = set()
+    for r in receipts:
+        eid = r.get("eventId")
+        src = by_event.get(eid, {})
+        written.add(eid)
+        changed = {p["id"]: {"lastInteraction": [p.get("priorLastInteraction"),
+                                                 src.get("date")]}
+                   for p in (r.get("people") or []) if p.get("id")}
+        nao_audit.record(actor, "wrote", why=_why(src),
+                         kind=r.get("kind"), nodeId=r.get("nodeId"),
+                         title=src.get("title") or r.get("title"),
+                         eventId=eid, auto=auto or None,
+                         changed=changed or None)
+
+    # Silence about a failure is the one thing an audit log cannot afford.
+    for item in items:
+        if item.get("eventId") not in written:
+            nao_audit.record(actor, "failed", why=_why(item),
+                             title=item.get("title"),
+                             eventId=item.get("eventId"), auto=auto or None)
+    return human, receipts
 
 
 def save_undo(receipts, titles=None):
@@ -178,6 +222,13 @@ def undo(selection="all"):
                 _restore_person(client, person, entry_lines)
             lines.append("↩︎ %s" % title)
             lines.extend(entry_lines)
+            nao_audit.record("bridge", "undo",
+                             why="reversed by Ruben",
+                             title=title, nodeId=node_id,
+                             eventId=item.get("eventId"),
+                             restored={p.get("id"): p.get("priorLastInteraction")
+                                       for p in (item.get("people") or [])
+                                       if p.get("id")} or None)
         except Exception as e:
             lines.append("⚠️ %s — undo failed: %s" % (title, str(e)[:120]))
             continue

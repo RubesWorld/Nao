@@ -72,6 +72,15 @@ if ${TIMEOUT_CMD[@]+"${TIMEOUT_CMD[@]}"} claude -p \
   SIZE=$(wc -c < "$OUTPUT" | tr -d ' ')
   echo "[$END_TIMESTAMP] END   $TASK_NAME (ok, ${SIZE} bytes written to $OUTPUT)" >> "$LOG"
 
+  # Every prompt job ends with one line naming what it wrote and where (the
+  # convention in CLAUDE.md), so the action log gets these for free. Skip a
+  # run that stayed quiet — a job that changed nothing is not an action.
+  SUMMARY=$(grep -v '^[[:space:]]*$' "$OUTPUT" | tail -1)
+  if [[ -n "$SUMMARY" ]]; then
+    python3 "$NAO_DIR/scripts/nao_audit.py" record \
+      "$TASK_NAME" wrote "scheduled run" "$SUMMARY" >/dev/null 2>&1 || true
+  fi
+
   # Send Telegram notification only if output has non-whitespace content.
   # nao_telegram.py chunks by characters — the old `head -c 3500` could
   # split an emoji mid-byte and Telegram rejects invalid UTF-8 outright.

@@ -34,6 +34,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from nao_telegram import send as tg_send  # noqa: E402
 import calendar_log                              # noqa: E402
+import nao_audit                                 # noqa: E402
 
 NAO = os.path.expanduser("~/Nao")
 STATE_DIR = os.path.join(NAO, "state")
@@ -56,6 +57,7 @@ POLL_TIMEOUT = 30
 CLAUDE_TIMEOUT = 600
 RATE_LIMIT_PER_HOUR = 30
 MAX_CONSECUTIVE_ERRORS = 20   # then exit and let launchd restart us
+POLL_ERROR_AUDIT_AT = 3       # a dropped long poll is routine; three is a fault
 MODEL = os.environ.get("NAO_BRIDGE_MODEL", "sonnet")
 
 # Conversation continuity: freeform exchanges are remembered for follow-ups
@@ -551,6 +553,7 @@ def builtin(text):
                 "  log 1,3 / log all / no\n"
                 "                — log the calendar hangouts/trips proposed\n"
                 "  undo / undo 1 — reverse the last calendar write\n"
+                "  actions [n]   — what Nao wrote lately, and why\n"
                 "anything else is passed to Nao:\n"
                 "  !deep …       — harder question, bigger model\n"
                 "  !fast …       — quick lookup, cheap model\n"
@@ -574,6 +577,15 @@ def builtin(text):
     # "log my workout" is a request for Nao, not an answer to a proposal.
     # Same guard as `log`: only claim `undo` when what follows is a
     # selector. "undo my last email" is a request for Nao, not for this.
+    # Same guard as log/undo: "actions on my calendar" is a question for Nao.
+    if cmd == "actions" or (cmd.startswith("actions ")
+                            and cmd[len("actions"):].strip().isdigit()):
+        n = cmd[len("actions"):].strip()
+        entries = nao_audit.read(int(n) if n.isdigit() else 8)
+        if not entries:
+            return "Nothing written yet."
+        return "\n".join(nao_audit.describe(e) for e in reversed(entries))
+
     if cmd == "undo" or cmd.startswith("undo "):
         arg = cmd[len("undo"):].strip()
         if re.fullmatch(r"(all|\*|[\d,\s]*)", arg):
@@ -851,6 +863,8 @@ def main():
           % (MODEL, allowed, offset,
              "SKIP-PERMISSIONS" if tools is None else ",".join(tools)))
     consecutive_errors = 0
+    poll_error_reported = False
+    last_poll_error = ""
 
     while True:
         try:
@@ -868,10 +882,24 @@ def main():
                       "restarts with fresh .env" % e.code)
                 return 1
             consecutive_errors += 1
-            audit("poll error: %s" % e)
+            last_poll_error = str(e)
         except Exception as e:
             consecutive_errors += 1
-            audit("poll error: %s" % e)
+            last_poll_error = str(e)
+
+        # A single failed long poll is weather, not news — Telegram drops the
+        # connection routinely. Logging each one buried the command audit
+        # trail under 673 lines of "read operation timed out" against 47 real
+        # entries, which is the opposite of what an audit log is for. Same
+        # ladder the relay check uses: speak once it persists, once on
+        # recovery, silence in between.
+        if consecutive_errors == POLL_ERROR_AUDIT_AT:
+            audit("poll failing (%d in a row): %s"
+                  % (consecutive_errors, last_poll_error))
+            poll_error_reported = True
+        elif not consecutive_errors and poll_error_reported:
+            audit("polling recovered")
+            poll_error_reported = False
 
         if consecutive_errors:
             if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:

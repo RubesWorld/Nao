@@ -40,6 +40,7 @@ NAO = os.path.expanduser("~/Nao")
 sys.path.insert(0, os.path.join(NAO, "scripts"))
 
 import calendar_log  # noqa: E402
+import nao_audit     # noqa: E402
 SEEN_PATH = os.path.join(NAO, "state", "calendar-seen.json")
 PENDING_PATH = os.path.join(NAO, "state", "calendar-pending.json")
 LOG_PATH = os.path.join(NAO, "logs", "tasks.log")
@@ -234,6 +235,12 @@ def main():
             record["outcome"] = "retired"
             record["at"] = now
             log("retiring unanswered proposal: %s" % item.get("title"))
+            # Giving up on something is a decision made on Ruben's behalf,
+            # and the one most likely to go unnoticed.
+            nao_audit.record("calendar-capture", "skipped",
+                             why="aired %d times with no answer" % MAX_PROPOSALS,
+                             title=item.get("title"), eventId=eid,
+                             kind=item.get("kind"))
             continue
         fresh.append(item)
 
@@ -252,7 +259,8 @@ def main():
     logged_text, receipts = "", []
     if auto:
         try:
-            logged_text, receipts = calendar_log.apply_items(auto, run_claude)
+            logged_text, receipts = calendar_log.apply_items(
+                auto, run_claude, actor="calendar-capture", auto=True)
         except Exception as e:
             log("auto-log failed (%s) — falling back to asking" % e)
             ask = fresh
@@ -275,6 +283,12 @@ def main():
 
     for item in ask:
         eid = item["eventId"]
+        # Choosing to ask is a decision too, and the reason it was not
+        # written is the thing worth being able to check later.
+        nao_audit.record("calendar-capture", "asked",
+                         why=calendar_log._why(item),
+                         title=item.get("title"), eventId=eid,
+                         kind=item.get("kind"))
         rec = seen.get(eid, {"proposals": 0})
         rec["proposals"] = rec.get("proposals", 0) + 1
         rec["at"] = now

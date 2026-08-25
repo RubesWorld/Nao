@@ -122,7 +122,8 @@ Nao's autonomous heartbeat runs as launchd jobs (NOT Cowork `/schedule`, since r
 ├── prompts/<task-name>.md     # One markdown file per scheduled task
 ├── briefings/                 # Output cache (auto-named YYYY-MM-DD-<task>.md)
 ├── launchd/                   # Plist templates tracked in git
-└── logs/tasks.log             # Unified log
+├── logs/tasks.log             # Operational log — did it run? (heartbeat-heavy)
+└── logs/actions.jsonl         # Action log — what changed, and why
 ```
 
 `~/Library/LaunchAgents/com.nao.<task>.plist` schedules each task. The plist calls `run-task.sh` with the prompt file path and model name as args.
@@ -333,6 +334,89 @@ To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{wa
 3. Verify the Tana write happened
 4. Copy `com.nao.morning-briefing.plist`, change Label, schedule, and ProgramArguments
 5. `launchctl load ~/Library/LaunchAgents/com.nao.<name>.plist`
+
+## The two logs, and which one answers your question
+
+`logs/tasks.log` is **operational**: did the machine run? It is deliberately
+heartbeat-heavy — health-check.py reads the watcher's hourly line to prove the
+watcher is alive, so that noise has a consumer and must not be "cleaned up".
+Over a typical week it carries ~330 watcher lines against ~30 of everything
+else, which makes it useless for the other question.
+
+`logs/actions.jsonl` is the **action log**: what did Nao change, and on what
+grounds. One line per write, per autonomous decision, and per reversal —
+never a heartbeat, never a run that changed nothing. A few lines a day, which
+is what keeps it readable a month later. Written via `scripts/nao_audit.py`
+(`record()` from Python, `nao_audit.py record …` from shell), read with
+`actions` / `actions 20` on Telegram, or:
+
+```
+jq -r 'select(.action=="wrote")' logs/actions.jsonl
+grep '"auto":true' logs/actions.jsonl
+```
+
+`why` is the field that earns the file. A list of writes tells you what
+happened; only the reason tells you whether it should have — so an entry
+records the grounds ("intent-backed; Chloe resolved"), and a write that moved
+a field records both values (`"lastInteraction": ["2026-05-08","2026-08-23"]`)
+so it can be checked and reversed. It is append-only: `state/*.json` holds
+current state and gets rewritten, this holds history and never does. Gitignored
+along with the rest of `logs/` — it is runtime data about real people.
+
+## Working on Nao — branches and deploys
+
+**The working tree is production.** This is the one thing that makes this repo
+different from a normal one, and it is easy to forget: `~/Nao` is not a
+checkout of the thing that runs, it *is* the thing that runs. launchd
+executes `scripts/*.py` from this directory, and `git checkout` therefore
+swaps live code underneath running services. A branch switch here is a
+deploy.
+
+Consequences worth internalising:
+
+- **The bridge holds its code in memory.** It reads the file once at startup,
+  so editing on a branch does not affect the running daemon — until it
+  restarts, at which point it silently picks up whatever is on disk. If it
+  restarts while a feature branch is checked out, that branch is now live.
+- **The watcher and calendar-capture re-read on every run**, because launchd
+  re-execs them. Whatever is on disk at :50 or 21:30 is what runs.
+- **So: end on `main`.** Do the work on a branch, merge it, `git pull`, and
+  leave the tree on `main` before walking away. Never leave a feature branch
+  checked out overnight.
+
+### The flow
+
+1. `git checkout -b <short-kebab-name>` — name the change, not the ticket:
+   `calendar-autolog`, `deploy-fixes`, `logging-and-audit`
+2. Build. Commit in logical units, with the *why* in the body — this file and
+   the commit log are the only places a future session learns why something
+   is shaped the way it is.
+3. `git push -u origin <branch>` and open a PR. Even solo, the PR body is
+   where the reasoning and the verification evidence live.
+4. Merge, `git checkout main`, `git pull`.
+5. **Restart what the change touched** (see below), then confirm it came back.
+
+### What needs restarting after a merge
+
+| Changed | Action |
+|---|---|
+| `telegram-bridge.py`, `nao_telegram.py`, `calendar_log.py`, `nao_audit.py` | `launchctl unload && load com.nao.telegram-bridge.plist`, then check the startup line in `logs/telegram-bridge.log` |
+| `watcher.py`, `tana_client.py`, `calendar-capture.py` | nothing — next scheduled run picks it up. Force one to verify rather than waiting. |
+| Any `prompts/*.md` | nothing; read fresh each run |
+| A `.plist` | `launchctl unload && load`, and copy it into `launchd/` so it is tracked |
+
+### Verify on the machine, not just in tests
+
+Everything that broke this month broke in ways no amount of reading would
+have caught: a missing `Authorization` header, `read_node` rendering
+`**Label**: value` instead of `Label:: value`, dates arriving as `Mon, Jun 1`,
+a walker collecting supertag ids as if they were results, an import dropped
+by a merge. Each failed *silently* and fell back, so the system looked healthy
+while the feature did nothing.
+
+Run the thing. Check `logs/tasks.log` for which path it actually took, and
+`logs/actions.jsonl` for what it actually wrote. A test that passes against
+mocked shapes proves the code is self-consistent, not that it is correct.
 
 ## Tana search nodes — hard-won rules
 
