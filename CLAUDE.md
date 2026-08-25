@@ -273,6 +273,33 @@ savings challenge are habit routines and are excluded everywhere. Looks back
 days for trips. Interactions land on the daily note for the day they happened;
 trips land beside the existing ones under the home node.
 
+**Booking-backed items are written without asking; self-created ones ask.**
+The split is evidence, not confidence. A `FROM_GMAIL` event — hotel, flight,
+ticket, reservation — is someone else's record that the thing happened, with
+money attached. An event Ruben made himself is a note about a plan, and a
+plan that quietly fell through looks identical to one that happened, because
+he does not go back and tidy the calendar. A confident name match does not
+change that: `Chloe in BK` resolves to a real Person and still asks. An
+interaction with nobody resolved always asks too — the value of the node is
+who was there.
+
+Only a **declined** invite is a visible cancellation. Deleted and cancelled
+events never reach the proposer at all, since Google leaves them out of
+`list_events` and it reads after the event has ended. The undetectable case
+— event left on the calendar, evening never happened — is exactly why the
+weak-evidence half still asks.
+
+Anything written can be reversed with `undo` (`undo 1`, `undo all`) for 48
+hours. `prompts/calendar-log.md` returns a JSON **receipt** of what it wrote:
+node ids, and each Person's Last interaction *before* the overwrite.
+Restoring means putting that date back rather than clearing the field —
+clearing would read as "never seen", a worse lie than the one being
+reversed. The undo path is deterministic Python straight to tana-local
+(`scripts/calendar_log.py`), no model involved: same split as the watcher,
+because the reversal path is the one that has to be exact. Deleting the node
+in Tana by hand is only half an undo — it leaves Last interaction pointing at
+a hangout that never happened, which is the field the Sunday review reads.
+
 State is `state/calendar-seen.json`, keyed by Google Calendar event id — that
 is what stops the same hangout being proposed nightly forever. An item aired
 twice with no answer is **retired**, not re-sent; `no` marks it skipped so it

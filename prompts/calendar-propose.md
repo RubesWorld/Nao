@@ -57,6 +57,12 @@ people. Signals, strongest first:
 1. An event still upcoming tonight has not happened yet, and proposing it
 invites logging a dinner Ruben never ate.
 
+**Never propose an event you declined.** If your own attendee entry
+(`self: true`) has `responseStatus: "declined"`, you said you were not going.
+Cancelled and deleted events never reach you at all — Google leaves them out
+of `list_events` — so a decline is the one cancellation signal that is
+actually visible here, and it must be honoured.
+
 ### Never propose as an interaction
 
 - Solo appointments and services — barbershop, sauna, doctor, dentist,
@@ -95,7 +101,27 @@ hotel name and location, flight numbers and airports. That detail is already
 sitting in the auto-created Gmail events; carrying it over is most of this
 proposal's value.
 
-# Step 4 — Match people against Tana
+# Step 4 — Rate the evidence
+
+Set `evidence` on every item. This decides whether the caller writes it
+straight to Tana or asks Ruben first, so be honest rather than generous.
+
+- `booking` — someone else's record of the event exists. `eventType` is
+  `FROM_GMAIL` (a hotel, flight, ticket, or reservation confirmation landed
+  in his inbox), or the event was created by another person who invited him.
+  Money or a counterparty is attached, so it is strong evidence the thing
+  actually happened.
+- `intent` — Ruben created it himself. `Chloe in BK`, `Catan`, `Potentially
+  help Rachel with box thing`. This is a note about a plan, and plans get
+  cancelled silently: he does not go back and tidy the calendar afterwards,
+  so a self-created event that never happened looks identical to one that
+  did. Weak evidence, however confident the rest of the extraction is.
+
+A confident name match does NOT make something `booking`. `Chloe in BK`
+resolves to a real Person node and is still `intent` — who it names says
+nothing about whether it happened.
+
+# Step 5 — Match people against Tana
 
 For every name you extracted, run
 `search_nodes` with `hasType: "cQ7tTJTcfs72"` and `textContains: <name>`.
@@ -106,7 +132,7 @@ For every name you extracted, run
 Do NOT create Person nodes. Do not guess between two people with the same
 first name — emit `null` and let Ruben resolve it.
 
-# Step 5 — Check Tana for what is already there
+# Step 6 — Check Tana for what is already there
 
 Before proposing, make sure you would not be creating a duplicate:
 
@@ -126,7 +152,7 @@ Before proposing, make sure you would not be creating a duplicate:
 The caller also filters by calendar event id, so a repeat proposal is caught
 twice. Skipping here saves the second check from ever mattering.
 
-# Step 6 — Output
+# Step 7 — Output
 
 A single JSON array, no fences, no commentary. Maximum 8 items, most clearly
 correct first. If nothing qualifies, print exactly `[]`.
@@ -137,7 +163,7 @@ An `interaction` item:
 {"kind":"interaction","eventId":"60p32p9k74o32b9g","title":"Dinner w Chloe",
  "date":"2026-08-23","type":"In-person","where":"Brooklyn",
  "people":[{"name":"Chloe","id":"aBc123"}],
- "reason":"named hangout, 3h"}
+ "evidence":"intent","reason":"named hangout, 3h"}
 ```
 
 A `trip` item:
@@ -146,11 +172,13 @@ A `trip` item:
 {"kind":"trip","eventId":"cgo3eohlc8p62bb3","title":"Detroit Trip",
  "start":"2026-08-14","end":"2026-08-16","destination":"Detroit, MI",
  "lodging":"","flights":"UA 3412 EWR→DTW 8/13, UA 3644 DTW→EWR 8/16",
- "companions":"","reason":"3-day block with round-trip flights"}
+ "companions":"","evidence":"booking",
+ "reason":"3-day block with round-trip flights"}
 ```
 
 Rules:
 
+- `evidence` must be exactly `booking` or `intent`
 - `type` must be exactly one of: `In-person`, `Call`, `Text`, `Email`,
   `Social media`, `Group event`
 - `date`, `start`, `end` are `YYYY-MM-DD`
