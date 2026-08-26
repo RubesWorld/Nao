@@ -116,7 +116,10 @@ def main(argv):
         detail = argv[5] if len(argv) > 5 else None
         print(json.dumps(record(actor, action, why=why, detail=detail)))
         return 0
-    limit = int(argv[2]) if len(argv) > 2 and argv[2].isdigit() else 20
+    # Accept the count in either position: `nao_audit.py 20` and
+    # `nao_audit.py list 20` both read naturally, and guessing wrong just
+    # silently ignored the number.
+    limit = next((int(a) for a in argv[1:] if a.isdigit()), 20)
     for entry in reversed(read(limit)):
         print(describe(entry))
     return 0
