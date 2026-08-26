@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from nao_telegram import send as tg_send  # noqa: E402
 import calendar_log                              # noqa: E402
 import nao_audit                                 # noqa: E402
+import interaction_note                          # noqa: E402
 
 NAO = os.path.expanduser("~/Nao")
 STATE_DIR = os.path.join(NAO, "state")
@@ -554,6 +555,7 @@ def builtin(text):
                 "                — log the calendar hangouts/trips proposed\n"
                 "  undo / undo 1 — reverse the last calendar write\n"
                 "  actions [n]   — what Nao wrote lately, and why\n"
+                "  note …        — add detail to a logged hangout\n"
                 "anything else is passed to Nao:\n"
                 "  !deep …       — harder question, bigger model\n"
                 "  !fast …       — quick lookup, cheap model\n"
@@ -577,6 +579,11 @@ def builtin(text):
     # "log my workout" is a request for Nao, not an answer to a proposal.
     # Same guard as `log`: only claim `undo` when what follows is a
     # selector. "undo my last email" is a request for Nao, not for this.
+    if cmd == "note" or cmd.startswith("note "):
+        return interaction_note.add_note(
+            text.strip()[len("note"):].strip(),
+            lambda t: run_claude(t, model="sonnet"))
+
     # Same guard as log/undo: "actions on my calendar" is a question for Nao.
     if cmd == "actions" or (cmd.startswith("actions ")
                             and cmd[len("actions"):].strip().isdigit()):
@@ -999,7 +1006,8 @@ def main():
             # take a minute. A silent gap reads as broken, so ack those too.
             lowered = text.strip().lower()
             if (lowered.startswith(("cleanup", "triage", "do ", "log "))
-                    or lowered in ("do", "log", "undo")):
+                    or lowered.startswith("note ")
+                    or lowered in ("do", "log", "undo", "note")):
                 send(token, chat_id, "on it…")
 
             with Typing(token, chat_id):

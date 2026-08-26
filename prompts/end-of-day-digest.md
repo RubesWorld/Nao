@@ -64,6 +64,7 @@ Body sections (omit empty ones):
   Do not consolidate or summarize — enumerate. The point is that future Nao can search this digest and find what was captured.
 - **Open threads** — unresolved inbox items, open promises created today, ideas needing exploration
 - **Sparse interactions** — list any interactions logged today with minimal detail. Format: "<title> — N attendees, no per-person notes. Anything specific to add about <names>?" The point is to gently nudge Ruben to fill in detail while it's fresh, not to nag.
+  - **Tell him how to answer.** A nudge with no reply path is why these stay empty — this digest arrives as a one-way push, so a bare reply has no context to attach itself to. End the section with the literal command, e.g. ``reply `note Chloe was great, she's moving to LA` `` using the actual name. He can send it as a voice note; it is transcribed on the mini and handled the same way.
 - **Tomorrow's setup** — anything specific that should land in tomorrow morning's briefing
 
 If a category has zero items, omit that line. If everything is empty, write a single line: "Quiet day — no Tana activity."
@@ -89,6 +90,7 @@ Print 2-4 short readable lines. Lead with what was accomplished (positive frame)
 ```
 
 Rules:
+- If an interaction logged today is missing Vibe or per-person notes, the 💬 line must name it and end with `— reply: note <name> …` so the nudge carries its own reply path
 - Lead with wins, not gaps
 - Name specific items, not just counts
 - Max 200 chars
