@@ -24,7 +24,8 @@ Cadence-to-days mapping (for reach-out window math):
 # Step 3: Gather all people
 
 `search_nodes` with `hasType: "cQ7tTJTcfs72"`. For each Person:
-- Read the node to get Last interaction (`q5wo_UUohjlq`), Cadence (`wVnOpgqJYQJT`), Relationship (`fxpCQuDuXPd7`), Important dates (`3AemJsZ4ADDe`), Next reach out (`7F-NpOa3hg5j`), Context, Notes, Interests
+- Read the node to get Last interaction (`q5wo_UUohjlq`), Cadence (`wVnOpgqJYQJT`), Relationship (`fxpCQuDuXPd7`), **Birthday (`LneKNR9MAoEt`)**, Important dates (`3AemJsZ4ADDe`), Next reach out (`7F-NpOa3hg5j`), Context, Notes, Interests
+  - Read **both** date fields. The Person tag has a dedicated Birthday field *and* a multi-value Important dates field, and people get entered in either — Birthday is what Tana's own UI offers first, so it is the one most likely to be filled by hand. Checking only Important dates meant a birthday typed into the obvious field never surfaced.
 - For each, search related interaction nodes (tag `1y3M8tt6ahGs`) by Person field — note the most recent and its Vibe
 
 # Step 4: Categorize each person
@@ -35,7 +36,7 @@ Build these buckets:
 
 **Coming up this week** — Next reach out date is in next 7 days, OR (Last interaction + cadence-to-days) lands in next 7 days.
 
-**Birthdays / important dates this week** — Important dates field contains a date in next 7 days (match by month/day, ignore year).
+**Birthdays / important dates this week** — **Birthday** (`LneKNR9MAoEt`) or **Important dates** (`3AemJsZ4ADDe`) falls in the next 7 days (match by month/day, ignore year — these recur). Check both fields on every person; a birthday in either one counts.
 
 **Stale relationships** — Relationship = Family or Close friend AND no interaction (tag `1y3M8tt6ahGs`) in last 60 days, regardless of cadence.
 

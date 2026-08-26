@@ -22,7 +22,8 @@ Fields (use IDs in Tana paste):
 | Interests | `nB-gMHdXZA5j` | Options multi: Travel, Fitness, Music, Finance, Spirituality, Food, Wine, Tech, Sports, Art, Reading |
 | Last interaction | `q5wo_UUohjlq` | Date |
 | Next reach out | `7F-NpOa3hg5j` | Date |
-| Important dates | `3AemJsZ4ADDe` | Date (multi) — birthdays, anniversaries |
+| Birthday | `LneKNR9MAoEt` | Date — **use this for a birthday** |
+| Important dates | `3AemJsZ4ADDe` | Date (multi) — anniversaries, other recurring dates |
 | Notes | `QUwmlIpeAfCm` | Plain text |
 | Role | `O4oU8Du1jxea` | Options |
 | Email | `63VLgPp4MT-M` | Instance of E-Mail |
@@ -51,7 +52,8 @@ Fields (use IDs in Tana paste):
   - [[^G0JyrqEiSl3q]]:: <Context paragraph>
   - [[^NcIOJEIxEhW3]]:: <Location>
   - [[^nB-gMHdXZA5j]]:: <Interest>
-  - [[^3AemJsZ4ADDe]]:: <YYYY-MM-DD>
+  - [[^LneKNR9MAoEt]]:: <YYYY-MM-DD birthday>
+  - [[^3AemJsZ4ADDe]]:: <YYYY-MM-DD other recurring date>
   - [[^QUwmlIpeAfCm]]:: <Notes>
 ```
 
@@ -69,10 +71,10 @@ Only include fields that have actual values. Don't invent data.
   - [[^fxpCQuDuXPd7]]:: Friend
   - [[^G0JyrqEiSl3q]]:: Architect. Born in NJ, raised in Houston. Very solutions-oriented. Has a boyfriend named Ryan.
   - [[^NcIOJEIxEhW3]]:: Bushwick, Brooklyn
-  - [[^3AemJsZ4ADDe]]:: 2026-05-01
+  - [[^LneKNR9MAoEt]]:: 2026-05-01
 ```
 
-Then confirm: `Added Lindsay Barranco as #Person (node ID: <id>). Fields: Relationship, Context, Location, Important dates.`
+Then confirm: `Added Lindsay Barranco as #Person (node ID: <id>). Fields: Relationship, Context, Location, Birthday.`
 
 ## Rules
 
