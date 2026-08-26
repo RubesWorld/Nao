@@ -335,6 +335,49 @@ To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{wa
 4. Copy `com.nao.morning-briefing.plist`, change Label, schedule, and ProgramArguments
 5. `launchctl load ~/Library/LaunchAgents/com.nao.<name>.plist`
 
+## Filling in what the calendar could not know — `note`
+
+The auto-logger writes a skeleton: it knows an evening happened and who was
+on the invite. It cannot know how it went, what anyone said, or who actually
+showed up to something whose title named a venue. The end-of-day digest spots
+a thin node and nudges; `note` is how the nudge gets answered, typed or
+spoken, without opening Tana.
+
+    note Chloe was great, she's moving to LA in the fall
+
+**Python resolves which node, the model decides what goes in it.** Attaching
+detail to the wrong hangout is the failure that would make the loop
+untrustworthy, and it has a deterministic answer, so targeting never reaches
+the model: `scripts/interaction_note.py` reads recent interactions from Tana,
+prefers one Ruben named, otherwise takes the most recent **thin** one (no Vibe,
+no Their updates — the same test the digest uses). If the message opens by
+naming something that matches nothing, it asks instead of falling back;
+writing the right detail onto the wrong night is worse than asking. It always
+echoes the node it touched.
+
+Fields are **appended, never replaced**, so a second note cannot destroy the
+first.
+
+**Vibe is inferred only from stated sentiment.** "It was great" sets Great;
+"we talked about the Spain trip" leaves it unset. Vibe drives the Concerning
+vibes section of the Sunday review, so a guessed value either raises a false
+alarm or buries a real one. A Vibe already set is never overwritten.
+
+Two things are **flagged, never written** — a durable fact about a person
+("she's moving to LA") belongs on the Person node and the memory protocol is
+propose-first; a promise needs Deadline and Status or it never surfaces in
+the NAO-INDEX queue, and `note` cannot know the deadline. Both get recorded
+where they are true (Their updates, Promises made) and surfaced for Ruben to
+promote.
+
+No undo state, deliberately: it only fills empty fields and appends to full
+ones, so there is nothing to destroy. Writes land in `logs/actions.jsonl`
+like everything else.
+
+One operational quirk: **Tana's search index lags a few seconds behind a
+write.** A `note` sent in the same breath as an auto-log may not find the
+node yet. Send it again.
+
 ## The two logs, and which one answers your question
 
 `logs/tasks.log` is **operational**: did the machine run? It is deliberately
