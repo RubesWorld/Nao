@@ -38,6 +38,21 @@ Run these searches and inspect results:
 
 7. **Long-open #promise count** — total promises with Status = Open created more than 30 days ago. These have lingered.
 
+8. **Did the nudging work?** — read three files with the Read tool. None of this is in Tana; it is Nao's own record of what it interrupted Ruben with.
+
+   - `~/Nao/state/watcher.json` — one entry per tracked condition. Note `timesNotified`, `snoozedUntil`, `dropped`, `firstSeen`.
+   - `~/Nao/state/calendar-seen.json` — one entry per calendar proposal, with `outcome` (`logged`, `skipped`, `retired`, `pending`) and `proposals` (times aired).
+   - `~/Nao/logs/actions.jsonl` — one line per write, decision and reversal. Count `wrote` vs `asked`, and any `undo`.
+
+   What to look for, in order of how much it matters:
+
+   - **An item that hit `timesNotified: 3` and got auto-snoozed.** The ladder ran its whole course and the thing is still open. That is the clearest signal a condition is miscalibrated: three interruptions bought nothing, so either the alert is the wrong intervention or the item needs breaking down rather than repeating.
+   - **Proposals `retired` unanswered** — aired twice, never answered, dropped silently. A high retired-rate means the proposals are not worth the tap, which is worth knowing before adding more of them.
+   - **Anything `dropped`** — Ruben explicitly said stop. Two drops in the same area means the condition is wrong, not the timing.
+   - **`undo` entries** — Nao wrote something he had to reverse. Rare is fine; a pattern means an auto-write rule is too loose.
+
+   State the rate plainly: "3 of 5 proposals answered", "1 condition auto-snoozed after 3 alerts". Do not editorialise about his follow-through — this section audits *Nao*, not Ruben. The failure mode of the whole ambient layer is notification fatigue, and the only way to see it coming is to count what got ignored.
+
 # Step 4: Write the review to Tana
 
 Get this week's daily note via `get_or_create_calendar_node`. `import_tana_paste` under it. Tag `#[[^4utYKeS9qOH-]]`:
@@ -55,6 +70,7 @@ Body sections (omit empty ones):
 - **Contradictions detected** — one or two lines per conflict: the stored belief, what the digest says instead, and the date it changed. End the section with the literal next step — ``send `cleanup facts` to Nao on Telegram to review and outdate these`` — so the finding has somewhere to go. Without that, this section has historically just described drift and left it in place. If none, omit the section.
 - **Lingering ideas** — count of Raw ideas, list top 3 by date created (oldest first)
 - **Long-open promises** — count of promises older than 30 days still open
+- **Alerting health** — how Nao's own interruptions landed. Answer rate on proposals, any condition that exhausted the ladder and auto-snoozed, anything dropped, any undo. If a condition has now fired three times without resolving, say so and name it: it should either change shape or be dropped. Omit the section only if nothing was ever sent.
 - **This week's recommendation** — your single highest-priority "do this" for the upcoming week, based on the data. One sentence.
 
 Keep under 50 lines. Be specific. No filler.

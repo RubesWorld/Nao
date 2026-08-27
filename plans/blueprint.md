@@ -170,9 +170,16 @@ Rough priority order:
 6. **Notification feedback loop** — weekly-review reads watcher state:
    alerts sent vs done/snoozed/dropped; chronic snoozes mean a miscalibrated
    condition.
-7. **Passive interaction capture** — propose #interaction nodes from
-   calendar events with attendees (needs #1's calendar habit first);
-   propose-confirm via the cleanup-style flow, never silent writes.
+7. **Passive interaction capture** — ✅ **DONE 2026-08-20..27**, and it did
+   not need item 1 first. `scripts/calendar-capture.py` proposes #interaction
+   and #trip nodes nightly. One correction to the plan as written: attendee
+   lists are useless here, because Ruben creates nearly all his own events
+   and so is the only attendee — extraction is driven by names in event
+   *titles*. Booking-backed events (FROM_GMAIL: hotels, flights, tickets)
+   are written automatically and are reversible with `undo`; self-created
+   ones still ask, because a plan that quietly fell through looks identical
+   to one that happened. `note` fills in the detail the calendar cannot
+   know.
 8. **Adopt Tana's hosted MCP (beta)** — ✅ **DONE 2026-08-27.** Connector added
    on claude.ai and verified: `claude mcp list` reports `claude.ai Tana Cloud:
    https://app.tana.inc/mcp - ✔ Connected`. The localhost constraint is now
