@@ -173,7 +173,14 @@ Rough priority order:
 7. **Passive interaction capture** — propose #interaction nodes from
    calendar events with attendees (needs #1's calendar habit first);
    propose-confirm via the cleanup-style flow, never silent writes.
-8. **Adopt Tana's hosted MCP (beta)** — confirmed 2026-08-20 from the docs:
+8. **Adopt Tana's hosted MCP (beta)** — ✅ **DONE 2026-08-27.** Connector added
+   on claude.ai and verified: `claude mcp list` reports `claude.ai Tana Cloud:
+   https://app.tana.inc/mcp - ✔ Connected`. The localhost constraint is now
+   lifted for interactive surfaces — the Claude mobile app, Cowork, and Claude
+   Code web sessions can reach the graph. The heartbeat stays local as planned.
+   Original note follows.
+
+   Confirmed 2026-08-20 from the docs:
    `https://app.tana.inc/mcp`, HTTP + OAuth, no desktop app required,
    **same toolset as the local server including reads** (search_nodes,
    read_node, get_children, schemas, plus all mutations). Beta, paid plan.
@@ -207,7 +214,16 @@ Rough priority order:
    1. Tana connector added on claude.ai (prerequisite, item 8)
    2. Fresh Claude Code web session with the connector attached — observe
       one real search_nodes/read_node round-trip (never ship guessed tool
-      shapes), then build + publish
+      shapes), then build + publish.
+      **This step cannot be done from the local CLI** (checked 2026-08-27):
+      the Tana Cloud connector shows Connected in `claude mcp list`, but its
+      tools are not exposed to a local session's registry, and there is no
+      OAuth token in env to enumerate them. The artifact `mcp` capability is
+      confirmed available for this account, and only **claude.ai** connectors
+      are valid there — Tana Cloud qualifies, `tana-local` never will. The
+      capability contract also forbids publishing a page that calls a tool
+      whose real request/response has not been observed in-session, so the
+      round-trip has to happen on a surface where the connector is live.
    3. v1 is READ-ONLY, deliberately — keeps sunk cost low while the
       commit-to-Tana question is open; the rendering layer is
       substrate-agnostic and only the thin data layer speaks Tana
