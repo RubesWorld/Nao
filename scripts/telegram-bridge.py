@@ -321,7 +321,7 @@ PROPOSAL_KINDS = {
     "cleanup": {
         "execute_prompt": EXECUTE_PROMPT,
         "verbs": {"trash": "trash", "mark_outdated": "mark outdated",
-                  "mark_done": "mark done"},
+                  "mark_done": "mark done", "amend": "amend"},
         "extra_tools": None,
         "empty": "Nothing to clean up in that scope.",
     },
@@ -372,6 +372,14 @@ def propose(kind, prompt_path, prompt_suffix=""):
         note = it.get("reason") or it.get("note")
         if note:
             lines.append("     %s" % note)
+        # An amend rewrites text Ruben has to live with, so show what it
+        # would become. Approving a deletion blind loses a node; approving
+        # an edit blind silently rewrites what Nao believes about him.
+        if it.get("newText"):
+            preview = it["newText"]
+            if len(preview) > 220:
+                preview = preview[:217] + "…"
+            lines.append("     → %s" % preview)
     lines.append("")
     lines.append("or type `do 1,3` to pick specific ones")
 

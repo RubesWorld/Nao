@@ -63,6 +63,27 @@ Default to `all`. Only propose within the requested scope.
 - Financial account or goal nodes — flag them in `reason` if stale, but
   propose `mark_outdated` at most, never `trash`.
 
+## Prefer `amend` — most contradictions are partial
+
+Before proposing `mark_outdated` or `trash`, ask whether the node is *wholly*
+wrong or only *partly*. Partly is the common case, and forcing it into
+all-or-nothing is how a memory quietly gets worse while looking maintained.
+
+- "Trains for aesthetics via resistance training, 6 days per week" when the
+  motivation has shifted to prevention → the training is unchanged and still
+  true. Outdating it discards a true fact to fix a false clause. **Amend.**
+- "Apartment search criteria (mid-2026 move)" after the move completed → the
+  move-in date expired, but the neighbourhood ranking, budget and
+  distance-to-train deal-breaker describe what he wants in a home, not that
+  particular search. **Amend** the framing; do not outdate the substance.
+- "Shares a 2-bedroom with a friend" after moving to live alone → nothing in
+  it survives. **Outdate**, then trash on a later pass.
+
+`amend` keeps one node currently true rather than leaving a dead one beside a
+new one. Reach for it whenever some clause is still accurate, and preserve his
+wording — rewrite only the part that stopped being true, and say in `reason`
+which part changed.
+
 When uncertain, leave it out. A missed cleanup costs nothing; a wrong one
 costs trust in the whole flow.
 
@@ -75,7 +96,10 @@ correct first.
 [{"id":"abc123","title":"Shares a 2-bedroom with HS friend","action":"mark_outdated","reason":"superseded Aug 2026 — moved to 188 Humboldt, lives alone"}]
 ```
 
-- `action` must be exactly one of: `trash`, `mark_outdated`, `mark_done`
+- `action` must be exactly one of: `trash`, `mark_outdated`, `mark_done`,
+  `amend`
+- `amend` requires `newText`: the full replacement text for the node's detail
+  field. Write it out completely — the executor replaces, it does not merge.
 - `title` — short, under 60 chars, enough to recognise it
 - `reason` — under 90 chars, why it is safe to act on
 - If nothing qualifies, print exactly `[]`

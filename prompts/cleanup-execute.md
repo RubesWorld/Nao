@@ -20,6 +20,22 @@ the workspace trash and is recoverable. Do not attempt a hard delete.
 If the node has no Confidence field (it is not a `#fact`/`#preference`), skip it
 and report why.
 
+**`amend`** — the node is partly right, so correct it in place rather than
+retiring it. On the node:
+- Find the detail field for its tag — `Fact` (`Ae5CAmU-T7ov`) on a `#fact`,
+  `Preference` (`EoswIzb3fTIv`) on a `#preference` — and `set_field_content`
+  it to the proposal's `newText` verbatim. Do not re-edit or improve on it;
+  Ruben approved that exact wording.
+- If the node's *title* still names the part that stopped being true, update
+  it to match. A node reading "aesthetic via resistance training" whose body
+  now says the motivation changed is half-corrected and will be re-flagged
+  every week.
+- `set_field_content` Last confirmed — `yIQFmolSFz9q` on a `#fact`,
+  `rqA7KoeZx3Gr` on a `#preference` — to today, `YYYY-MM-DD`. It has just
+  been reviewed and is true again; leaving the old date would have the
+  staleness check flag it immediately.
+- Leave Confidence alone. An amended node is current, not outdated.
+
 **`mark_done`** — on the `#promise`:
 - `set_field_option` Status (`R4CiFnM0eZgx`) → Done
 - `set_field_content` Closed (`tfAT2tfpG0gi`) → today, `YYYY-MM-DD`
