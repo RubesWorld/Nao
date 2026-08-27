@@ -202,7 +202,14 @@ Rough priority order:
      compromised connected account = graph access.
    (The write-only Input API remains relevant only for tokened, non-OAuth
    automation; the hosted MCP supersedes it for everything interactive.)
-9. **Nao HQ — artifact front end** (planned 2026-08-20; the long-standing
+9. **Nao HQ — artifact front end** — ✅ **v1 BUILT 2026-08-27**, published as
+   a private Artifact declaring `mcp` against Tana Cloud (`search_nodes`,
+   `read_node` only), read-only as planned. Build notes and the connector's
+   query traps are in the session memory files; `plans/nao-hq-brief.md` holds
+   the design constraints, written after the build — worth checking v1
+   against them. Original plan follows.
+
+   (Planned 2026-08-20; the long-standing
    "no front end" gap). A claude.ai Artifact page declaring the `mcp`
    runtime capability calls the viewer's connectors with their credentials
    — so once the Tana hosted-MCP connector (item 8) is added, a private
@@ -215,10 +222,14 @@ Rough priority order:
    2. Fresh Claude Code web session with the connector attached — observe
       one real search_nodes/read_node round-trip (never ship guessed tool
       shapes), then build + publish.
-      **This step cannot be done from the local CLI** (checked 2026-08-27):
-      the Tana Cloud connector shows Connected in `claude mcp list`, but its
-      tools are not exposed to a local session's registry, and there is no
-      OAuth token in env to enumerate them. The artifact `mcp` capability is
+      **Correction (2026-08-27, same day):** an earlier note here said this
+      step could not be done from the local CLI. That was wrong, and Nao HQ
+      was in fact built and published from the Mac mini CLI that morning.
+      The connector's tools *are* reachable locally — they surface as
+      deferred tools named by **UUID** (`mcp__<uuid>__search_nodes`), not by
+      display name, which is why a ToolSearch for "Tana Cloud" found nothing
+      and the wrong conclusion got recorded. Search by tool name, not
+      connector name. The artifact `mcp` capability is
       confirmed available for this account, and only **claude.ai** connectors
       are valid there — Tana Cloud qualifies, `tana-local` never will. The
       capability contract also forbids publishing a page that calls a tool
