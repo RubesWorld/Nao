@@ -22,7 +22,17 @@ Run these searches and inspect results:
 
 4. **Dormant active projects** — `search_nodes` with `hasType: "Wgx1yMsS_LcO"`, `field: { fieldId: "_ZZ9rE87D4mz", stringValue: "Active" }`. For each, search for related #session-digest nodes mentioning the project in the last 14 days. Flag projects with no recent activity.
 
-5. **Contradictions** — Look at recent #fact and #decision nodes (last 30 days). Cross-reference for obvious conflicts: facts that contradict each other, decisions that conflict with newer facts, preferences that contradict recent behavior. This is judgment-based — flag genuine contradictions, not minor variations.
+5. **Contradictions** — check stored memory against what has actually happened.
+
+   Read the `Facts learned` (`Ed-vuqRMgfB2`) and `Decisions` (`xFe0N07CkiAO`) fields of `#session-digest` nodes (`4utYKeS9qOH-`) from the last 30 days, then compare them against `#fact` (`Sk_ziuZwe1pu`), `#preference` (`1u7Mz9dZp7GJ`) and `#decision` (`ubqmsjwBBw3C`) nodes. Those two digest fields are the compact record of what changed; reading them beats reading the digests whole.
+
+   The digests are the point. Comparing facts only against each other misses the common case, which is not two facts disagreeing — it is a fact quietly going out of date while life moved on and only the digests noticed.
+
+   **A contradiction means both cannot be true at once.** A new address, a closed account, a habit dropped and replaced. Not a contradiction: more detail, a changed mood, a temporary state, a plan not yet acted on, or the same fact worded differently. Growth is not conflict, and a review that cries wolf gets skimmed.
+
+   **Check the dates.** If a fact's Last confirmed (`yIQFmolSFz9q`) is newer than the digest, the fact already reflects the change — say nothing.
+
+   You are only reporting here. Do not edit, retag or outdate anything: the cleanup flow owns that, and it asks first.
 
 6. **Open #idea nodes (Raw)** — `search_nodes` with `hasType: "r4lfIKti2qS3"`, `field: { fieldId: "sPiU0uspKH1J", stringValue: "Raw" }`. Count how many ideas haven't been explored yet.
 
@@ -42,7 +52,7 @@ Body sections (omit empty ones):
 - **Overdue promises** (count + list each: "<what> for <who>, due <date>, X days overdue")
 - **Dormant projects** (count + list each: "<name> — last touched <date>, next action: <next action>")
 - **Stale memory** — list each stale fact/preference with last confirmed date. If 5+, just count plus top 3.
-- **Contradictions detected** — describe each conflict in 1-2 lines. If none, omit section.
+- **Contradictions detected** — one or two lines per conflict: the stored belief, what the digest says instead, and the date it changed. End the section with the literal next step — ``send `cleanup facts` to Nao on Telegram to review and outdate these`` — so the finding has somewhere to go. Without that, this section has historically just described drift and left it in place. If none, omit the section.
 - **Lingering ideas** — count of Raw ideas, list top 3 by date created (oldest first)
 - **Long-open promises** — count of promises older than 30 days still open
 - **This week's recommendation** — your single highest-priority "do this" for the upcoming week, based on the data. One sentence.
