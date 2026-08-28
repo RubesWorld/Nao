@@ -406,6 +406,30 @@ so it can be checked and reversed. It is append-only: `state/*.json` holds
 current state and gets rewritten, this holds history and never does. Gitignored
 along with the rest of `logs/` — it is runtime data about real people.
 
+## Beeper — comms search (installed, not yet wired)
+
+Beeper Desktop 4.3.73 is installed on the mini. It ships a **built-in MCP
+server** at `localhost:23373` bridging Google Messages (SMS and RCS),
+WhatsApp, Signal, Telegram, Slack and a dozen more. That is the same shape as
+tana-local, so it will work from headless `claude -p` under launchd once it
+is live — which is what makes it worth having over a search tool with no MCP.
+
+`docs/beeper-setup.md` has the remaining steps; they need a human, because
+they are signing in and pairing a phone by QR. `plans/blueprint.md` item 5
+has why this replaced Traul.
+
+**It is deliberately not wired to anything autonomous yet** — it is public
+beta, and the rule already applied to Tana's hosted MCP holds: interactive
+first. No autostart plist, no watcher condition, no health-check entry, and
+no scheduled prompt knows it exists. When that changes it needs all four,
+copying the BlueBubbles pattern — a dead chat bridge is silent, and silence
+looks exactly like nobody texting.
+
+**Never enable Beeper's Remote Access.** It exposes the local API to the
+internet, and that API reads every message on every connected network. The
+Telegram bridge is already the remote surface and has an allowlist, an audit
+log and a rate limit in front of it.
+
 ## Working on Nao — branches and deploys
 
 **The working tree is production.** This is the one thing that makes this repo
