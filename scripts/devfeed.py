@@ -49,6 +49,7 @@ def fetch_repo(repo, since):
 
     merges = []
     merged_prs = set()
+    merged_titles = set()
     for pr in pulls:
         if not pr.get("merged_at"):
             continue
@@ -56,6 +57,7 @@ def fetch_repo(repo, since):
         if ts < since:
             continue
         merged_prs.add(pr["number"])
+        merged_titles.add(pr["title"].strip())
         merges.append({
             "type": "merge",
             "title": pr["title"],
@@ -72,9 +74,13 @@ def fetch_repo(repo, since):
             continue
         commit_ts.append(ts)
         msg = c["commit"]["message"].split("\n")[0]
-        # Merge commits ("Merge pull request #N ...") and squash commits
-        # ("... (#N)") duplicate the PR's own merge entry — skip them there,
-        # though they still count toward the sparkline via commit_ts.
+        # Three shapes duplicate a PR's own merge entry: the merge commit
+        # ("Merge pull request #N ..."), a squash commit ("... (#N)"), and —
+        # for merge-commit PRs whose title is the branch commit's subject —
+        # the branch commit itself. Skip all three from the item list; they
+        # still count toward the sparkline via commit_ts.
+        if msg.strip() in merged_titles:
+            continue
         n = None
         if msg.startswith("Merge pull request #"):
             try:
