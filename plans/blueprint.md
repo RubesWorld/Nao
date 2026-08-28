@@ -44,7 +44,7 @@ and environmental awareness.
 | Ambient conditions | (not in plan) | ✅ **the watcher** — stateful, escalating, dismissable; see `plans/ambient-nao.md` |
 | Computer use | Cowork Computer Use | ✅ available; last-resort per CLAUDE.md decision rule; never for banking |
 | Remote dev | Claude Code CLI + Channels + VPS | 🔁 Claude Code on the web + the bridge; no VPS (see Phase 6) |
-| Communication search | Traul | ⏳ never installed (see Open items) |
+| Communication search | Traul | 🔁 Traul rejected 2026-08-27; **Beeper Desktop MCP** is the answer (see item 5) |
 | Calendar of record | (implicit) | ✅ Google Calendar (nycrar@gmail.com); reachable from headless runs via the Google Calendar MCP |
 | Self-monitoring | (not in plan) | ✅ `scripts/health-check.py`, weekly |
 
@@ -106,9 +106,9 @@ after payday, so the deposit has settled). Open question, low stakes.
   that headless runs could not reach the calendar. They can, through the
   Google Calendar MCP. Build it as one morning pass over today's agenda, not
   the plan's every-30-minutes poll.
-- **Traul (+ SMS Backup+): ⏳ never installed.** Unified comms search is
-  still the gap the plan said it was. Re-scope before building: Cowork now
-  has Gmail / Google Calendar / Krisp MCPs, which cover part of the promise.
+- **Traul (+ SMS Backup+): 🔁 rejected 2026-08-27, superseded by Beeper.**
+  Re-scoping found most of the promise already covered and the remainder
+  better served elsewhere — see roadmap item 5.
 - Claude Code Channels: 🔁 covered by the bridge (chat commands) + Claude
   Code on the web (remote dev).
 
@@ -166,7 +166,52 @@ Rough priority order:
    cleanup flow rather than acting silently).
 4. **Retrieval-quality verdict** (close it or add a semantic layer — decide
    from 5 months of lived experience, not speculation).
-5. **Comms search** (Traul or MCP-based equivalent) — re-scope first.
+5. **Comms search** — ✅ **decided 2026-08-27: not Traul. Beeper Desktop
+   MCP.** Not yet installed; the decision is what changed, not the state.
+
+   **Why not Traul** (`github.com/dandaka/traul` — real, active, AGPL-3.0,
+   local SQLite with FTS5 + Ollama embeddings). Four reasons, in order:
+
+   - **No MCP server.** Everything in Nao reaches a tool through MCP or a
+     thin Python client. Traul would need a wrapper we own forever.
+   - **No Google Messages, no SMS** — which turns out to be the actual gap.
+     Its sources are Slack, Discord, Telegram, Gmail, Linear, WhatsApp,
+     Claude Code sessions, Markdown.
+   - **It duplicates what already exists.** Gmail is covered twice (Gmail
+     MCP + Superhuman Mail MCP), meetings by Krisp (`search_meeting_content`
+     is full-text across every meeting), Telegram by the bridge, Slack by an
+     MCP that only needs authenticating. The March plan called comms search
+     a gap; most of it closed on its own.
+   - **New dependencies on the heartbeat host** — Bun *and* Ollama, on the
+     machine whose whole value is being boringly reliable.
+
+   **Why Beeper.** `claude mcp add beeper http://localhost:23373/v0/mcp -t
+   http -s user` — the same shape as tana-local, which matters: tana-local
+   works from headless `claude -p` under launchd, so Beeper will too, and
+   the watcher and weekly review can query messages rather than only
+   interactive sessions. Bridges Google Messages (SMS **and** RCS), WhatsApp,
+   Instagram, Telegram, Signal, Messenger, X, Google Chat, Google Voice,
+   LinkedIn, Discord and Slack. Local-only, free, runs on device.
+
+   **Conditions before wiring it to anything autonomous:**
+   - It is **public beta and self-described as experimental**. The same rule
+     applied to the hosted Tana MCP holds — interactive first, heartbeat
+     later.
+   - It is **another app that must stay running**, like Tana desktop and
+     BlueBubbles. It needs watcher/health-check coverage or it fails silently.
+   - Google Messages needs the **Android paired by QR with an active SIM**,
+     so the phone is a dependency too.
+   - **Do not enable Remote Access.** It exposes the API to the internet; the
+     Telegram bridge is already the remote surface, with an allowlist.
+   - **The search API is unverified** — the docs reference a Search method but
+     the reference page 404s. Observe one real call before building on it.
+
+   **iMessage was investigated and is not the target.** It is one group chat.
+   For the record: `~/Library/Messages/chat.db` is *not* readable by the
+   terminal (Full Disk Access belongs to BlueBubbles, not the shell), but the
+   relay's `POST /api/v1/message/query` returns full message data with no FDA
+   needed. The archive is only two months deep (2026-06-30 onward) because the
+   mini only started receiving iMessage when the relay went up.
 6. **Notification feedback loop** — weekly-review reads watcher state:
    alerts sent vs done/snoozed/dropped; chronic snoozes mean a miscalibrated
    condition.
@@ -262,6 +307,7 @@ Rough priority order:
 | 2026-06 | Slack MCP dependency dropped from scheduled tasks. |
 | 2026-07 | listing-monitor retired (move complete). promise-deadline-monitor retired in favor of the watcher. |
 | 2026-08 | Ambient layer shipped: stateful watcher + Telegram bridge (`plans/ambient-nao.md`). Tana search-node rules documented after the TODAY HQ rebuild. |
+| 2026-08-27 | **Comms search decided: Beeper, not Traul.** Traul rejected for having no MCP server, no Google Messages/SMS (the actual gap), duplicating already-covered channels (Gmail twice over, Krisp, Telegram, Slack), and adding Bun + Ollama to the heartbeat host. Beeper Desktop ships a built-in MCP at `localhost:23373` — same shape as tana-local, so it works headless — and bridges Google Messages incl. RCS plus a dozen networks, locally. Public beta, so interactive use first and no autonomous wiring until proven. iMessage ruled out as the target: it is one group chat, and the local archive is only two months deep. |
 | 2026-08-20 | Hardening PR (#1): watcher state keyed by node id, per-item alert actions, persistent drop, local-time deadlines, deterministic HTTP retrieval with LLM fallback, bridge tool allowlist + transcript continuity, one Telegram sender, run-task timeout/skip/failure pings, weekly health-check, calendar wrapper (Google Calendar = calendar of record). |
 | 2026-08-20 | Sequential Thinking / Markdownify / Context7 MCPs formally rejected. VPS layer formally closed as obsoleted. Blueprint converted to this living document. |
 | 2026-08-20 | Bridge conversational upgrades shipped: typing indicator, local voice-note transcription, explicit model routing. OpenClaw-class framework swap reconfirmed as rejected — features get added to the bridge instead. |
