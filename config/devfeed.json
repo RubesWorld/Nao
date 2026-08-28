@@ -1,0 +1,11 @@
+{
+  "bind": "100.118.35.80",
+  "port": 8300,
+  "days": 30,
+  "spark_days": 14,
+  "repos": [
+    { "repo": "RubesWorld/Nao", "display": "Nao", "slot": 1 },
+    { "repo": "RubesWorld/health-hq", "display": "Health HQ", "slot": 3 },
+    { "repo": "RubesWorld/HomeAssistant", "display": "Home Automation", "slot": 2 }
+  ]
+}

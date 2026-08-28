@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nao Dev Feed</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --critical: #d03b3b;
+    --slot-1: #2a78d6;
+    --slot-2: #eb6834;
+    --slot-3: #1baf7a;
+    --slot-4: #eda100;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --border: rgba(255,255,255,0.10);
+      --critical: #d03b3b;
+      --slot-1: #3987e5;
+      --slot-2: #d95926;
+      --slot-3: #199e70;
+      --slot-4: #c98500;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 20px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  h1 { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+  #updated { font-size: 13px; color: var(--muted); }
+  #updated.stale { color: var(--critical); font-weight: 600; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+    gap: 14px;
+  }
+  .lane {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .lane-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .lane-name { font-size: 15px; font-weight: 650; }
+  .lane-when { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+  .spark { display: block; margin: 8px 0 10px; }
+  .items { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+  .item { display: flex; gap: 8px; align-items: baseline; font-size: 13.5px; }
+  .badge {
+    flex: none; font-size: 11px; font-weight: 600; padding: 1px 7px;
+    border-radius: 99px; border: 1px solid var(--border); color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .badge.merge { border-color: transparent; color: #fff; }
+  .item a { color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+  .item a:hover { text-decoration: underline; }
+  .item .when { margin-left: auto; flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .more { font-size: 12.5px; color: var(--muted); margin-top: 8px; cursor: pointer; background: none; border: none; padding: 0; font-family: inherit; }
+  .more:hover { color: var(--ink-2); }
+  .empty { color: var(--muted); font-size: 13.5px; }
+  #tip {
+    position: fixed; pointer-events: none; z-index: 10; display: none;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 8px; font-size: 12px; color: var(--ink-2);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  #err { color: var(--critical); font-size: 13.5px; margin-bottom: 12px; display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nao Dev Feed</h1>
+  <span id="updated"></span>
+</header>
+<div id="err"></div>
+<div class="grid" id="grid"></div>
+<div id="tip"></div>
+
+<script>
+const SLOTS = 4;
+const tip = document.getElementById('tip');
+
+function rel(ts) {
+  const s = (Date.now() - new Date(ts)) / 1000;
+  if (s < 60) return 'now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  if (s < 7 * 86400) return Math.floor(s / 86400) + 'd ago';
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function sparkline(counts, color, spanDays) {
+  // Micro bar chart: thin marks, rounded data ends, anchored to the baseline.
+  const H = 34, BW = 12, GAP = 4, PAD = 1;
+  const W = counts.length * (BW + GAP) - GAP + PAD * 2;
+  const max = Math.max(1, ...counts);
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H + 6}`);
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', H + 6);
+  svg.classList.add('spark');
+  const total = counts.reduce((a, b) => a + b, 0);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `${total} commits in the last ${spanDays} days`);
+  const base = document.createElementNS(svg.namespaceURI, 'line');
+  base.setAttribute('x1', 0); base.setAttribute('x2', W);
+  base.setAttribute('y1', H + 0.5); base.setAttribute('y2', H + 0.5);
+  base.setAttribute('stroke', 'var(--grid)');
+  svg.appendChild(base);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  counts.forEach((c, i) => {
+    const day = new Date(today);
+    day.setDate(day.getDate() - (counts.length - 1 - i));
+    const h = c === 0 ? 0 : Math.max(3, (c / max) * (H - 4));
+    // invisible hover target wider than the mark
+    const hit = document.createElementNS(svg.namespaceURI, 'rect');
+    hit.setAttribute('x', PAD + i * (BW + GAP) - GAP / 2);
+    hit.setAttribute('y', 0);
+    hit.setAttribute('width', BW + GAP);
+    hit.setAttribute('height', H + 6);
+    hit.setAttribute('fill', 'transparent');
+    const label = day.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+      + ' — ' + c + (c === 1 ? ' commit' : ' commits');
+    hit.addEventListener('pointerenter', e => {
+      tip.textContent = label;
+      tip.style.display = 'block';
+    });
+    hit.addEventListener('pointermove', e => {
+      tip.style.left = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8) + 'px';
+      tip.style.top = (e.clientY - 30) + 'px';
+    });
+    hit.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+    svg.appendChild(hit);
+    if (c > 0) {
+      const bar = document.createElementNS(svg.namespaceURI, 'rect');
+      bar.setAttribute('x', PAD + i * (BW + GAP));
+      bar.setAttribute('y', H - h);
+      bar.setAttribute('width', BW);
+      bar.setAttribute('height', h + 2);   // extend past baseline so top corners
+      bar.setAttribute('rx', 2);           // are rounded but the bottom sits square
+      bar.setAttribute('fill', color);
+      bar.setAttribute('pointer-events', 'none');
+      svg.appendChild(bar);
+      const clip = document.createElementNS(svg.namespaceURI, 'clipPath');
+      const id = 'c' + Math.random().toString(36).slice(2);
+      clip.setAttribute('id', id);
+      const cr = document.createElementNS(svg.namespaceURI, 'rect');
+      cr.setAttribute('x', 0); cr.setAttribute('y', 0);
+      cr.setAttribute('width', W); cr.setAttribute('height', H);
+      clip.appendChild(cr);
+      svg.appendChild(clip);
+      bar.setAttribute('clip-path', `url(#${id})`);
+    }
+  });
+  return svg;
+}
+
+const expanded = new Set();
+
+function render(feed) {
+  const upd = document.getElementById('updated');
+  const age = (Date.now() - new Date(feed.generated_at)) / 60000;
+  upd.textContent = 'updated ' + rel(feed.generated_at);
+  upd.classList.toggle('stale', age > 20);
+
+  const grid = document.getElementById('grid');
+  grid.replaceChildren();
+  const repos = [...feed.repos].sort((a, b) =>
+    (b.last_activity || '').localeCompare(a.last_activity || ''));
+  for (const r of repos) {
+    const color = `var(--slot-${((r.slot - 1) % SLOTS) + 1})`;
+    const lane = document.createElement('section');
+    lane.className = 'lane';
+    const head = document.createElement('div');
+    head.className = 'lane-head';
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = color;
+    const name = document.createElement('a');
+    name.className = 'lane-name';
+    name.textContent = r.display;
+    name.href = 'https://github.com/' + r.repo;
+    name.style.color = 'var(--ink)';
+    name.style.textDecoration = 'none';
+    const when = document.createElement('span');
+    when.className = 'lane-when';
+    when.textContent = r.last_activity ? rel(r.last_activity) : 'no activity';
+    head.append(dot, name, when);
+    lane.append(head, sparkline(r.spark, color, feed.spark_days));
+
+    if (!r.items.length) {
+      const e = document.createElement('p');
+      e.className = 'empty';
+      e.textContent = 'Nothing in the last ' + feed.days + ' days.';
+      lane.append(e);
+    } else {
+      const list = document.createElement('ul');
+      list.className = 'items';
+      const isOpen = expanded.has(r.repo);
+      const shown = isOpen ? r.items : r.items.slice(0, 6);
+      for (const it of shown) {
+        const li = document.createElement('li');
+        li.className = 'item';
+        const badge = document.createElement('span');
+        badge.className = 'badge' + (it.type === 'merge' ? ' merge' : '');
+        badge.textContent = it.type === 'merge' ? 'merged ' + it.ref : it.ref;
+        if (it.type === 'merge') badge.style.background = color;
+        const a = document.createElement('a');
+        a.textContent = it.title;
+        a.href = it.url;
+        a.target = '_blank';
+        const w = document.createElement('span');
+        w.className = 'when';
+        w.textContent = rel(it.ts);
+        li.append(badge, a, w);
+        list.append(li);
+      }
+      lane.append(list);
+      if (r.items.length > 6) {
+        const btn = document.createElement('button');
+        btn.className = 'more';
+        btn.textContent = isOpen ? 'show less' : `show all ${r.items.length}`;
+        btn.onclick = () => {
+          isOpen ? expanded.delete(r.repo) : expanded.add(r.repo);
+          render(feed);
+        };
+        lane.append(btn);
+      }
+    }
+    grid.append(lane);
+  }
+}
+
+let lastFeed = null;
+async function refresh() {
+  try {
+    const res = await fetch('feed.json?_=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    lastFeed = await res.json();
+    document.getElementById('err').style.display = 'none';
+    render(lastFeed);
+  } catch (e) {
+    const err = document.getElementById('err');
+    err.textContent = 'Could not load feed.json — collector may not have run yet. (' + e.message + ')';
+    err.style.display = 'block';
+  }
+}
+refresh();
+setInterval(refresh, 60000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refresh();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nao.devfeed</string>
+
+    <!-- Collector: polls GitHub (gh keyring auth) and regenerates
+         devfeed/feed.json. Stateless — safe to run any time. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/rubenmacmini/Nao/scripts/devfeed.py</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>300</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/rubenmacmini/Nao</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/rubenmacmini</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/rubenmacmini/Nao/logs/devfeed.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rubenmacmini/Nao/logs/devfeed.err</string>
+</dict>
+</plist>

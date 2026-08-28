@@ -34,12 +34,14 @@ WATCHER_MAX_GAP_HOURS = 3   # hourly job; allow some sleep slack
 AMBIENT_MAX_GAP_HOURS = {
     "watcher": WATCHER_MAX_GAP_HOURS,
     "calendar-capture": 30,   # nightly at 21:30, plus slack for a sleeping mini
+    "devfeed": 3,             # every 5 min; slack for a sleeping mini
 }
 
 # Managed outside run-task.sh; checked by their own signals below.
 SPECIAL = {"com.nao.watcher", "com.nao.telegram-bridge",
            "com.nao.health-check", "com.nao.calendar-capture",
-           "com.nao.bluebubbles", "com.nao.display-menu"}
+           "com.nao.bluebubbles", "com.nao.display-menu",
+           "com.nao.devfeed", "com.nao.devfeed-server"}
 
 
 def expected_runs(plist_path, window_days):
@@ -158,6 +160,15 @@ def main():
             pass
     if not bridge_ok:
         problems.append("telegram-bridge: not running (lock missing or stale)")
+
+    # Dev feed server: KeepAlive daemon on the tailnet; probe the port the
+    # dashboard actually uses.
+    try:
+        import urllib.request
+        urllib.request.urlopen("http://100.118.35.80:8300/feed.json", timeout=5)
+        fine.append("devfeed-server")
+    except Exception:
+        problems.append("devfeed-server: not answering on 100.118.35.80:8300")
 
     if problems:
         msg = "🩺 Nao health — %d issue(s) this week:\n" % len(problems) \

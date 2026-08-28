@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nao.devfeed-server</string>
+
+    <!-- Serves ~/Nao/devfeed (index.html + feed.json) on the tailnet only.
+         Bound to the Tailscale IP, so nothing on the LAN or internet can
+         reach it. If Tailscale is down at boot the bind fails and launchd
+         retries (ThrottleInterval) until it comes up. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>-m</string>
+        <string>http.server</string>
+        <string>8300</string>
+        <string>--bind</string>
+        <string>100.118.35.80</string>
+        <string>--directory</string>
+        <string>/Users/rubenmacmini/Nao/devfeed</string>
+    </array>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/rubenmacmini/Nao/devfeed</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/rubenmacmini/Nao/logs/devfeed-server.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rubenmacmini/Nao/logs/devfeed-server.err</string>
+</dict>
+</plist>
