@@ -55,6 +55,10 @@
   .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
   .pill.stale { color: var(--critical); font-weight: 600; }
   .pill.stale .dot { background: var(--critical); }
+  #filter-pill { cursor: pointer; border: none; font-family: inherit; min-height: 30px; }
+  #filter-pill .x { font-size: 13px; line-height: 1; }
+  .view-feed #filter-pill { background: #2c2c2a; color: var(--d-ink); }
+  .view-shiplog #filter-pill { background: #2b2620; color: #f7f4ee; }
 
   .switch {
     display: flex; border-radius: 99px; padding: 3px; gap: 2px;
@@ -78,8 +82,11 @@
   .card {
     background: var(--d-surface); border: 1px solid var(--d-border); border-radius: 12px;
     padding: 16px 18px 14px; display: flex; flex-direction: column; gap: 10px;
-    position: relative; overflow: hidden;
+    position: relative; overflow: hidden; cursor: pointer;
+    transition: opacity 0.15s, border-color 0.15s;
   }
+  .card.dim { opacity: 0.5; }
+  .card.dim:hover { opacity: 0.8; }
   .card .idbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
   .card .cardhead { display: flex; align-items: baseline; gap: 10px; }
   .card .cardhead a { font-size: 15.5px; font-weight: 600; color: var(--d-ink); text-decoration: none; }
@@ -188,6 +195,7 @@
     <div class="spacer"></div>
     <div class="today-date mono" id="date"></div>
     <div class="pill" id="updated-pill"><div class="dot"></div><span class="mono" id="updated">loading…</span></div>
+    <button class="pill" id="filter-pill" hidden></button>
     <div class="switch" role="tablist" aria-label="View">
       <button id="btn-feed" class="on" role="tab">Feed</button>
       <button id="btn-shiplog" role="tab">Ship Log</button>
@@ -209,6 +217,12 @@ try { view = localStorage.getItem('devfeed-view') === 'shiplog' ? 'shiplog' : 'f
 if (location.hash === '#shiplog') view = 'shiplog';
 else if (location.hash === '#feed') view = 'feed';
 const expanded = new Set();
+let filterRepo = null;
+
+function toggleFilter(repo) {
+  filterRepo = filterRepo === repo ? null : repo;
+  render();
+}
 
 function slotColor(slot, light) {
   const m = light ? SLOT_LIGHT : SLOT_DARK;
@@ -359,10 +373,16 @@ function renderFeed(root) {
   for (const r of repos) {
     const color = slotColor(r.slot, false);
     const card = el('section', 'card');
+    if (filterRepo) {
+      if (filterRepo === r.repo) card.style.borderColor = color;
+      else card.classList.add('dim');
+    }
+    card.onclick = () => toggleFilter(r.repo);
     const idbar = el('div', 'idbar'); idbar.style.background = color;
     const head = el('div', 'cardhead');
     const name = el('a', null, r.display);
     name.href = 'https://github.com/' + r.repo; name.target = '_blank';
+    name.onclick = e => e.stopPropagation();
     const when = el('span', 'when mono', r.last_activity ? rel(r.last_activity) : 'no activity');
     head.append(name, when);
     const totals = el('div', 'totals');
@@ -373,7 +393,10 @@ function renderFeed(root) {
 
   const timeline = el('div', 'timeline');
   const all = [];
-  for (const r of feed.repos) for (const it of r.items) all.push({ ...it, repo: r });
+  for (const r of feed.repos) {
+    if (filterRepo && r.repo !== filterRepo) continue;
+    for (const it of r.items) all.push({ ...it, repo: r });
+  }
   all.sort((a, b) => b.ts.localeCompare(a.ts));
   const shown = all.slice(0, 60);
   if (!shown.length) timeline.appendChild(el('p', 'empty', 'Nothing in the last ' + feed.days + ' days.'));
@@ -425,21 +448,25 @@ function renderShipLog(root) {
   const mast = el('div', 'masthead');
   mast.appendChild(el('h2', null, 'The Ship Log'));
   const todayKey = dayKey(new Date().toISOString());
+  const logRepos = feed.repos.filter(r => !filterRepo || r.repo === filterRepo);
   let shippedToday = 0;
-  for (const r of feed.repos) shippedToday += r.items.filter(i => dayKey(i.ts) === todayKey).length;
+  for (const r of logRepos) shippedToday += r.items.filter(i => dayKey(i.ts) === todayKey).length;
   mast.appendChild(el('div', 'shipped',
     shippedToday ? shippedToday + ' shipped today' : 'nothing shipped yet today'));
   log.appendChild(mast);
 
-  const repos = [...feed.repos].sort((a, b) =>
+  const repos = [...logRepos].sort((a, b) =>
     (b.last_activity || '').localeCompare(a.last_activity || ''));
   for (const r of repos) {
     const color = slotColor(r.slot, true);
     const sec = el('section', 'project-log');
     const head = el('div', 'plhead');
+    head.style.cursor = 'pointer';
+    head.onclick = () => toggleFilter(r.repo);
     const dot = el('span', 'pldot'); dot.style.background = color;
     const name = el('a', null, r.display);
     name.href = 'https://github.com/' + r.repo; name.target = '_blank';
+    name.onclick = e => e.stopPropagation();
     head.append(dot, name, el('span', 'plcount', repoTotals(r) + ', last ' + feed.spark_days + ' days'));
     sec.appendChild(head);
     const sparkRow = el('div', 'pl-spark-row');
@@ -506,6 +533,19 @@ function render() {
   const root = document.getElementById('view-root');
   root.replaceChildren();
   if (!feed) return;
+  const fp = document.getElementById('filter-pill');
+  const fr = filterRepo && feed.repos.find(r => r.repo === filterRepo);
+  if (fr) {
+    fp.hidden = false;
+    fp.replaceChildren();
+    const d = el('span', 'dot');
+    d.style.background = slotColor(fr.slot, view === 'shiplog');
+    fp.append(d, el('span', 'mono', fr.display), el('span', 'x', '✕'));
+    fp.onclick = () => toggleFilter(null);
+    fp.setAttribute('aria-label', 'Clear project filter');
+  } else {
+    fp.hidden = true;
+  }
   const pill = document.getElementById('updated-pill');
   const age = (Date.now() - new Date(feed.generated_at)) / 60000;
   document.getElementById('updated').textContent = 'updated ' + rel(feed.generated_at);
