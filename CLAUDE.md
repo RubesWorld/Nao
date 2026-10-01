@@ -575,3 +575,13 @@ When writing nodes to Tana:
 - Use `get_tag_schema` with `includeEditInstructions: true` before writing to confirm field IDs
 - Use `search_nodes` to find existing nodes before creating duplicates
 - For instance/reference fields, search for the target node first and use `[[Title^nodeId]]` syntax
+
+## Workflow
+
+Tier: lean
+Base branch: main
+Checks: none yet
+
+- TODO: no automated tests or lint for the Python/shell scripts yet.
+
+Used by the user-level `/start` → `/build` → `/ship` commands. `Tier: off` opts this repo out.
