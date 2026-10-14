@@ -8,7 +8,7 @@ Run Bash `date +%Y-%m-%d` for TODAY. LAST_WEEK = TODAY minus 7 days. NEXT_PAYDAY
 
 # Step 2: Last week's recommendation
 
-Read `~/Nao/briefings/<LAST_WEEK>-debt-paydown-check.md` with the Read tool. If it exists, take the dollar amount it told Ruben to pay. If it doesn't exist, skip the follow-up line in the output.
+Read `~/Nao/briefings/<LAST_WEEK>-debt-paydown-check.md` with the Read tool. If it exists, take the dollar amount it told Ruben to pay. If it doesn't exist, omit the follow-up line entirely — don't mention that the record is missing.
 
 # Step 3: Goals and accounts from Tana
 
