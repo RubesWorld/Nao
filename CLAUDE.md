@@ -147,7 +147,7 @@ The morning briefing still does not read the calendar. That is a scope
 choice, not a limitation.
 
 **Active tasks:** `morning-briefing`, `end-of-day-digest`, `weekly-review`,
-`relationship-review`, `mid-week-budget-check`, `payday-allocation-check`,
+`relationship-review`, `debt-paydown-check` (Wed 12:00), `payday-allocation-check`,
 `weekly-spending-digest`, `monthly-financial-closeout`, `finance-morning`
 (daily 08:30), `finance-evening` (daily 20:30) — all `claude -p` prompt
 jobs via `run-task.sh` — plus `health-check` (plain Python, Sunday 08:45,
@@ -155,7 +155,9 @@ reads tasks.log + LaunchAgents and reports whether the machine itself is
 healthy; always sends, so the report doubles as a liveness signal). Retired
 plists live in `launchd-archive/` rather than being deleted
 (`listing-monitor`, move complete; `promise-deadline-monitor`, superseded by
-the watcher; `morning-briefing.sh`, pre-run-task.sh prototype).
+the watcher; `morning-briefing.sh`, pre-run-task.sh prototype;
+`mid-week-budget-check`, its spending pulse duplicated the daily finance
+check-ins, so the Wednesday slot went to `debt-paydown-check`).
 
 ## The ambient layer — watcher + bridge + relay + calendar capture
 
