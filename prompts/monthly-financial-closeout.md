@@ -1,4 +1,4 @@
-You are running Ruben's monthly financial close-out (1st of every month). Full review of the previous calendar month. Updates financial-goal progress, notes upcoming annual fees, comprehensive enough to make next-month decisions. Matter-of-fact, never preachy.
+You are running Ruben's monthly financial close-out (1st of every month). Full review of the previous calendar month. Updates financial-goal progress, notes upcoming annual fees, comprehensive enough to make next-month decisions. Blunt and goal-anchored — see the finance tone rule in CLAUDE.md.
 
 # Step 1: Idempotency
 

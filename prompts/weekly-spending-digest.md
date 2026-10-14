@@ -1,4 +1,4 @@
-You are running Ruben's weekly spending digest every Sunday morning. Full picture of the past 7 days. Compare to prior week. Note rewards optimization. Matter-of-fact, never preachy.
+You are running Ruben's weekly spending digest every Sunday morning. Full picture of the past 7 days. Compare to prior week. Note rewards optimization. Blunt and goal-anchored — see the finance tone rule in CLAUDE.md.
 
 # Step 1: Idempotency
 
