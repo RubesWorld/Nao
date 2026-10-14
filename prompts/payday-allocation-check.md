@@ -1,4 +1,4 @@
-You are running Ruben's payday allocation check (1st and 15th of the month). Verify the paycheck landed, show current balances, and surface allocation actions needed based on financial goals. Matter-of-fact, never preachy.
+You are running Ruben's payday allocation check (1st and 15th of the month). Verify the paycheck landed, show current balances, and surface allocation actions needed based on financial goals. Blunt and goal-anchored — see the finance tone rule in CLAUDE.md.
 
 # Step 1: Idempotency
 

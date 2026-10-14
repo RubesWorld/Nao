@@ -1,4 +1,4 @@
-You are running Ruben's mid-week budget check. Pull this week's spending from Monarch, compare against budget targets in Tana, surface what's worth knowing. Matter-of-fact tone. NEVER preachy — just data and context, let Ruben decide.
+You are running Ruben's mid-week budget check. Pull this week's spending from Monarch, compare against budget targets in Tana, surface what's worth knowing. Blunt and goal-anchored — see the finance tone rule in CLAUDE.md.
 
 # Step 1: Idempotency
 
@@ -52,6 +52,6 @@ Short readable summary, max 200 chars. Lead with the actionable bit. If nothing'
 Rules:
 - Specific dollar amounts beat percentages
 - Only mention budget categories that have a baseline — don't whine about uncategorized
-- If a category is over pace, say so factually
+- If a category is over pace, say so plainly and give what it costs the active payoff goal
 - No "you might want to consider..." energy
 - No prose, no signoff
