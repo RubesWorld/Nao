@@ -3,9 +3,16 @@
   "port": 8300,
   "days": 30,
   "spark_days": 14,
+  "owner": "RubesWorld",
+  "active_days": 14,
+  "hide": [],
   "repos": [
-    { "repo": "RubesWorld/Nao", "display": "Nao", "slot": 1 },
+    { "repo": "RubesWorld/Nao", "display": "Nao", "slot": 1, "pin": true },
     { "repo": "RubesWorld/health-hq", "display": "Health HQ", "slot": 3 },
-    { "repo": "RubesWorld/HomeAssistant", "display": "Home Automation", "slot": 2 }
+    { "repo": "RubesWorld/HomeAssistant", "display": "Home Automation", "slot": 2 },
+    { "repo": "RubesWorld/peak", "display": "Peak", "slot": 4 },
+    { "repo": "RubesWorld/family-pulse", "display": "Family Pulse", "slot": 5 },
+    { "repo": "RubesWorld/factory", "display": "Factory", "slot": 6 },
+    { "repo": "RubesWorld/claude-dotfiles", "display": "Claude dotfiles", "slot": 7 }
   ]
 }
