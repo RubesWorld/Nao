@@ -56,6 +56,7 @@
   .pill.stale { color: var(--critical); font-weight: 600; }
   .pill.stale .dot { background: var(--critical); }
   #filter-pill { cursor: pointer; border: none; font-family: inherit; min-height: 30px; }
+  #filter-pill[hidden] { display: none; }   /* .pill's display: flex would otherwise beat [hidden] */
   #filter-pill .x { font-size: 13px; line-height: 1; }
   .view-feed #filter-pill { background: #2c2c2a; color: var(--d-ink); }
   .view-shiplog #filter-pill { background: #2b2620; color: #f7f4ee; }
