@@ -6,6 +6,7 @@
   "owner": "RubesWorld",
   "active_days": 14,
   "hide": [],
+  "board": { "owner": "RubesWorld", "number": 1 },
   "repos": [
     { "repo": "RubesWorld/Nao", "display": "Nao", "slot": 1, "pin": true },
     { "repo": "RubesWorld/health-hq", "display": "Health HQ", "slot": 3 },
