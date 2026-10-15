@@ -433,13 +433,18 @@ log and a rate limit in front of it.
 
 ## Dev feed — the project tracker dashboard
 
-A near-real-time view of what Ruben is shipping across his repos, at
+A near-real-time view of what Ruben is shipping, and what is waiting on him,
+across his repos — the place to catch up on context, especially once the AI
+factory opens PRs on its own. At
 **http://100.118.35.80:8300** (tailnet only — the port is bound to the
 Tailscale IP, so nothing on the LAN or internet can reach it).
 
 - **`com.nao.devfeed`** — every 5 min, `scripts/devfeed.py`. Deterministic
   Python, no LLM: polls GitHub via the `gh` CLI (keyring auth) for recent
-  commits and merged PRs per watched repo, and regenerates
+  commits and merged PRs per watched repo, plus open PRs (with check and
+  review state) and branches with commits in the last 7 days but no PR yet
+  (one GraphQL call per repo; a branch with any PR, even merged, is left
+  out, as is the `review-media` branch /ship writes GIFs to), and regenerates
   `devfeed/feed.json` **wholesale** each run — stateless on purpose, so there
   is no dedupe bookkeeping to corrupt. On any fetch failure it leaves the old
   feed in place rather than writing a partial one; the dashboard shows
@@ -450,11 +455,16 @@ Tailscale IP, so nothing on the LAN or internet can reach it).
   `python3 -m http.server` serving `~/Nao/devfeed/` (index.html is tracked in
   git; feed.json is generated and gitignored). If Tailscale is down at boot
   the bind fails and launchd retries every 60s until it comes up.
-- **Watched repos live in `config/devfeed.json`** — adding a project is one
-  entry: repo, display name, and a color slot (identity color, pinned per
-  project, never reassigned by position). Crosspoint gets added here the day
-  it becomes a repo with a GitHub remote. HomeAssistant was made a private
-  repo (2026-08-27) specifically so its changes show here.
+- **Watched repos are discovered, not listed.** Every non-archived,
+  non-fork repo of `owner` pushed within `active_days` (14) shows up on its
+  own, most recent first, and drops off after two quiet weeks. A new project
+  appears after its first push; nothing needs adding. `config/devfeed.json`
+  only holds overrides per repo: `display` name, colour `slot` (1–8, pinned
+  per project, never reassigned by position; without one the slot is derived
+  from the repo name, so it is stable but may collide), and `pin: true` to
+  show a repo even when quiet. `hide` lists repos never to show.
+  HomeAssistant was made a private repo (2026-08-27) specifically so its
+  changes show here.
 - Both jobs are wired into `health-check.py`: the collector via the ambient
   freshness map, the server via an HTTP probe of the real port.
 - Pause: `launchctl unload ~/Library/LaunchAgents/com.nao.devfeed{,-server}.plist`
