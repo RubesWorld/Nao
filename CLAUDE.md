@@ -444,13 +444,23 @@ Tailscale IP, so nothing on the LAN or internet can reach it).
   commits and merged PRs per watched repo, plus open PRs (with check and
   review state) and branches with commits in the last 7 days but no PR yet
   (one GraphQL call per repo; a branch with any PR, even merged, is left
-  out, as is the `review-media` branch /ship writes GIFs to), and regenerates
+  out, as is the `review-media` branch /ship writes GIFs to), plus the
+  AI-Factory project board from `board` in the config (cards not Done, and
+  Done in the last 7 days, each with when it entered its column), and regenerates
   `devfeed/feed.json` **wholesale** each run — stateless on purpose, so there
   is no dedupe bookkeeping to corrupt. On any fetch failure it leaves the old
   feed in place rather than writing a partial one; the dashboard shows
   "updated Xm ago" and turns it red past 20 min, so a dead collector is
   visible on the page itself. Squash and merge commits that duplicate a PR's
   own entry are folded into it; the sparkline counts every commit regardless.
+- **The page leads with catch-up.** A "since you last looked" line counts
+  merges, pushes, new PRs, active branches and board moves since the last
+  visit, and marks those rows with a blue edge. "Last visit" is stored in the
+  browser's localStorage, so it is per device; it moves when the tab has been
+  hidden for 30 minutes or on "Mark all seen". Below it: the factory board
+  (column counts, cards furthest along first, `needs-human` on top), open PRs
+  and branches. Age flags dim and mark PRs open 7+ days, branches quiet 3+
+  days, and cards in In Progress or Review for 3+ days.
 - **`com.nao.devfeed-server`** — KeepAlive daemon, plain
   `python3 -m http.server` serving `~/Nao/devfeed/` (index.html is tracked in
   git; feed.json is generated and gitignored). If Tailscale is down at boot

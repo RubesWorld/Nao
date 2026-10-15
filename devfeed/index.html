@@ -13,7 +13,7 @@
     --d-muted: #898781; --d-grid: #2c2c2a; --d-border: rgba(255,255,255,0.10);
     --l-page: #f7f4ee; --l-surface: #fffdf8; --l-ink: #2b2620; --l-ink2: #6b5d4a;
     --l-muted: #8a7f6e; --l-grid: #ddd5c7; --l-border: #ddd5c7;
-    --good: #0ca30c; --critical: #d03b3b;
+    --good: #0ca30c; --critical: #d03b3b; --warn: #c98500; --new: #3987e5;
   }
   * { box-sizing: border-box; margin: 0; }
   html { height: 100%; }
@@ -124,6 +124,33 @@
   .entry .flag.bad { color: var(--critical); border-color: var(--critical); }
   .entry .flag.ok { color: var(--good); border-color: var(--good); }
   .openwork { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
+  .entry .flag.warn { color: var(--warn); border-color: var(--warn); }
+  .entry.old { opacity: 0.62; }
+  .entry.old:hover { opacity: 1; }
+  .entry.new { box-shadow: inset 3px 0 0 var(--new); }
+  .entry .newtag { color: var(--new); font-weight: 600; }
+  .since {
+    margin-bottom: 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--d-surface); border: 1px solid var(--d-border); border-radius: 10px;
+    padding: 11px 14px; font-size: 13.5px; color: var(--d-ink2);
+  }
+  .since b { color: var(--d-ink); font-weight: 600; }
+  .since button {
+    margin-left: auto; border: 1px solid var(--d-border); background: none; color: var(--d-ink2);
+    font-family: inherit; font-size: 12px; padding: 5px 11px; border-radius: 99px; cursor: pointer;
+    min-height: 30px;
+  }
+  .since button:hover { color: var(--d-ink); }
+  .cols { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cols .col {
+    font-size: 11.5px; padding: 4px 9px; border-radius: 99px; color: var(--d-ink2);
+    border: 1px solid var(--d-border);
+  }
+  .cols .col b { color: var(--d-ink); font-weight: 600; margin-left: 4px; }
+  .cols .col.zero { color: var(--d-muted); }
+  .cols .col.zero b { color: var(--d-muted); }
+  .dayhead a.more { font-size: 12px; color: var(--d-muted); text-decoration: none; }
+  .dayhead a.more:hover { color: var(--d-ink); }
 
   /* ------- ship log view: editorial light ------- */
   .shiplog { max-width: 820px; margin: 0 auto; }
@@ -394,7 +421,7 @@ function openWorkSection(title, rows) {
 }
 function openWorkRow(it, icon, verb, flags, refText) {
   const color = slotColor(it.repo.slot, false);
-  const a = el('a', 'entry');
+  const a = el('a', 'entry' + (isNew(it.newAt || it.ts) ? ' new' : '') + (it.old ? ' old' : ''));
   a.href = it.url; a.target = '_blank';
   a.appendChild(icon(color));
   const body = el('div', 'body');
@@ -408,9 +435,128 @@ function openWorkRow(it, icon, verb, flags, refText) {
   a.appendChild(body);
   const ref = el('span', 'ref mono', refText);
   ref.style.background = alpha(color, 0.14);
-  a.append(ref, el('span', 'etime mono', rel(it.ts)));
+  a.append(ref, el('span', 'etime mono', it.ts ? rel(it.ts) : ''));
   return a;
 }
+/* ------- since you last looked ------- */
+// Per device (localStorage). The boundary stays fixed while the page is open,
+// moves to "when you left" once the tab has been hidden for 30 minutes, and
+// "Mark all seen" moves it to now.
+const SEEN_KEY = 'devfeed-seen';
+const AWAY_MS = 30 * 60000;
+function storeSeen() {
+  const now = new Date().toISOString();
+  try { localStorage.setItem(SEEN_KEY, now); } catch (e) {}
+  return now;
+}
+let since = null;
+try { since = localStorage.getItem(SEEN_KEY); } catch (e) {}
+if (!since) since = storeSeen();   // first visit: nothing is "new" yet
+let hiddenAt = null;
+function isNew(ts) { return !!ts && ts > since; }
+function days(ts) { return Math.floor((Date.now() - new Date(ts)) / 86400000); }
+
+const STALE_PR_DAYS = 7, QUIET_BRANCH_DAYS = 3, STUCK_CARD_DAYS = 3;
+const BOARD_COLUMNS = ['Inbox', "Spec'd", 'Ready', 'In Progress', 'Review'];
+
+function repoOf(name) {
+  return feed.repos.find(r => r.repo === name) || { repo: name, display: name.split('/')[1], slot: 8 };
+}
+function sinceBanner() {
+  let merges = 0, pushes = 0, prs = 0, branches = 0, failing = 0;
+  for (const r of feed.repos) {
+    for (const it of r.items) if (isNew(it.ts)) it.type === 'merge' ? merges++ : pushes++;
+    for (const p of r.open_prs || []) {
+      if (isNew(p.opened)) prs++;
+      if (p.checks === 'FAILURE' || p.checks === 'ERROR') failing++;
+    }
+    for (const b of r.branches || []) if (isNew(b.ts)) branches++;
+  }
+  const moved = ((feed.board || {}).cards || []).filter(c => isNew(c.since)).length;
+  const n = (k, one, many) => k + ' ' + (k === 1 ? one : many);
+  const parts = [];
+  if (merges) parts.push(n(merges, 'merge', 'merges'));
+  if (pushes) parts.push(n(pushes, 'push', 'pushes'));
+  if (prs) parts.push(n(prs, 'new PR', 'new PRs'));
+  if (branches) parts.push(n(branches, 'active branch', 'active branches'));
+  if (moved) parts.push(n(moved, 'card moved', 'cards moved'));
+  const box = el('div', 'since');
+  const d = new Date(since);
+  const when = (dayKey(since) === dayKey(new Date().toISOString()) ? 'today ' :
+    d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ', ') + clock(since);
+  const text = el('span');
+  if (parts.length) {
+    text.append('Since you last looked (' + when + '): ');
+    text.appendChild(el('b', null, parts.join(' · ')));
+  } else {
+    text.append('Nothing new since ' + when + '.');
+  }
+  box.appendChild(text);
+  if (failing) {
+    const f = el('span', null, n(failing, 'PR failing checks', 'PRs failing checks'));
+    f.style.color = 'var(--critical)';
+    box.appendChild(f);
+  }
+  if (parts.length) {
+    const btn = el('button', null, 'Mark all seen');
+    btn.onclick = () => { since = storeSeen(); render(); };
+    box.appendChild(btn);
+  }
+  return box;
+}
+
+/* ------- factory board ------- */
+function boardIcon(color) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('width', '18'); svg.setAttribute('height', '18'); svg.setAttribute('viewBox', '0 0 18 18');
+  svg.innerHTML =
+    `<rect x="2" y="3" width="14" height="12" rx="2.5" fill="none" stroke="${color}" stroke-width="1.6"/>` +
+    `<path d="M 7 3 L 7 15 M 11.5 3 L 11.5 15" stroke="${color}" stroke-width="1.4"/>`;
+  return svg;
+}
+function boardSection() {
+  const b = feed.board;
+  if (!b) return null;
+  const cards = b.cards.filter(c => !filterRepo || c.repo === filterRepo);
+  const open = cards.filter(c => c.status !== 'Done');
+  const sec = el('div', 'openwork-sec');
+  const head = el('div', 'dayhead');
+  const link = el('a', 'more mono', 'open board ↗');
+  link.href = b.url; link.target = '_blank';
+  head.append(el('div', 'kicker mono', 'Factory board'), el('div', 'rule'), link);
+  const cols = el('div', 'cols mono');
+  for (const name of BOARD_COLUMNS) {
+    const k = open.filter(c => c.status === name).length;
+    const chip = el('span', 'col' + (k ? '' : ' zero'), name);
+    chip.appendChild(el('b', null, String(k)));
+    cols.appendChild(chip);
+  }
+  const done = cards.filter(c => c.status === 'Done').length;
+  const chip = el('span', 'col' + (done ? '' : ' zero'), 'Done this week');
+  chip.appendChild(el('b', null, String(done)));
+  cols.appendChild(chip);
+  sec.append(head, cols);
+  // Furthest along first: Review, In Progress, Ready, Spec'd, Inbox.
+  const order = c => -BOARD_COLUMNS.indexOf(c.status);
+  open.sort((a, b) => (b.needs_human - a.needs_human) || (order(a) - order(b)) ||
+    (b.since || '').localeCompare(a.since || ''));
+  const list = el('div', 'entries');
+  for (const c of open) {
+    const flags = [];
+    if (c.needs_human) flags.push(['needs you', 'bad']);
+    const age = c.since ? days(c.since) : 0;
+    if ((c.status === 'In Progress' || c.status === 'Review') && age >= STUCK_CARD_DAYS)
+      flags.push(['stuck ' + age + 'd', 'warn']);
+    if (c.size) flags.push(['size ' + c.size]);
+    const row = openWorkRow({ ...c, ts: c.since || '', repo: repoOf(c.repo) }, boardIcon,
+      c.status + (c.since ? ' since ' + rel(c.since) : ''), flags, c.ref);
+    list.appendChild(row);
+  }
+  sec.appendChild(list);
+  return sec;
+}
+
 function renderOpenWork(timeline) {
   const prs = [], branches = [];
   for (const r of feed.repos) {
@@ -418,11 +564,12 @@ function renderOpenWork(timeline) {
     for (const p of r.open_prs || []) prs.push({ ...p, repo: r });
     for (const b of r.branches || []) branches.push({ ...b, repo: r });
   }
-  if (!prs.length && !branches.length) return;
+  const wrap = el('div', 'openwork');
+  const board = boardSection();
+  if (board) wrap.appendChild(board);
   // Ready-for-review first, drafts last; newest activity first within each.
   prs.sort((a, b) => (a.draft - b.draft) || b.ts.localeCompare(a.ts));
   branches.sort((a, b) => b.ts.localeCompare(a.ts));
-  const wrap = el('div', 'openwork');
   if (prs.length) {
     wrap.appendChild(openWorkSection('Waiting for review', prs.map(p => {
       const flags = [];
@@ -432,12 +579,19 @@ function renderOpenWork(timeline) {
       else if (p.checks === 'PENDING') flags.push(['checks running']);
       if (p.review === 'APPROVED') flags.push(['approved', 'ok']);
       if (p.review === 'CHANGES_REQUESTED') flags.push(['changes requested', 'bad']);
-      return openWorkRow(p, prIcon, 'opened ' + rel(p.opened), flags, p.ref);
+      const age = days(p.opened);
+      if (age >= STALE_PR_DAYS) flags.push(['open ' + age + 'd', 'warn']);
+      return openWorkRow({ ...p, newAt: p.opened, old: age >= STALE_PR_DAYS }, prIcon,
+        age >= STALE_PR_DAYS ? 'opened' : 'opened ' + rel(p.opened), flags, p.ref);
     })));
   }
   if (branches.length) {
-    wrap.appendChild(openWorkSection('In progress, no PR yet', branches.map(b =>
-      openWorkRow(b, commitIcon, 'last commit', [], b.branch))));
+    wrap.appendChild(openWorkSection('In progress, no PR yet', branches.map(b => {
+      const age = days(b.ts);
+      const quiet = age >= QUIET_BRANCH_DAYS;
+      return openWorkRow({ ...b, old: quiet }, commitIcon, 'last commit',
+        quiet ? [['quiet ' + age + 'd', 'warn']] : [], b.branch);
+    })));
   }
   wrap.appendChild(el('div', 'kicker mono', 'Shipped'));
   timeline.appendChild(wrap);
@@ -445,6 +599,7 @@ function renderOpenWork(timeline) {
 
 /* ------- feed view ------- */
 function renderFeed(root) {
+  root.appendChild(sinceBanner());
   const layout = el('div', 'layout');
   const rail = el('div', 'rail');
   rail.appendChild(el('div', 'kicker mono', 'Projects'));
@@ -495,7 +650,7 @@ function renderFeed(root) {
     const list = el('div', 'entries');
     for (const it of items) {
       const color = slotColor(it.repo.slot, false);
-      const a = el('a', 'entry' + (first ? ' latest' : ''));
+      const a = el('a', 'entry' + (first ? ' latest' : '') + (isNew(it.ts) ? ' new' : ''));
       first = false;
       a.href = it.url; a.target = '_blank';
       a.appendChild(it.type === 'merge' ? mergeIcon(color) : commitIcon(color));
@@ -662,7 +817,15 @@ async function refresh() {
 render();
 refresh();
 setInterval(refresh, 60000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { storeSeen(); hiddenAt = Date.now(); return; }
+  if (hiddenAt && Date.now() - hiddenAt > AWAY_MS) {
+    try { since = localStorage.getItem(SEEN_KEY) || since; } catch (e) {}
+  }
+  hiddenAt = null;
+  refresh();
+});
+window.addEventListener('pagehide', storeSeen);
 </script>
 </body>
 </html>

@@ -6,7 +6,9 @@ every non-archived, non-fork repo of the owner pushed within `active_days`,
 plus any `pin`ned in config/devfeed.json (which otherwise only holds display
 names, colour slots and `hide`s). Per repo it fetches recent commits and
 merged PRs, plus open PRs and in-progress branches — the "what is waiting on
-me" half that matters once the factory opens PRs on its own. Everything goes
+me" half that matters once the factory opens PRs on its own — and, once per
+run, the AI-Factory project board (which column each card is in, and since
+when). Everything goes
 through the gh CLI (keyring auth), and devfeed/feed.json is regenerated
 wholesale each run — stateless, so there is no dedupe bookkeeping to corrupt.
 The dashboard (devfeed/index.html) polls feed.json.
@@ -193,6 +195,65 @@ def fetch_open_work(repo):
     return prs, branches
 
 
+BOARD_QUERY = """
+query($owner: String!, $number: Int!) {
+  user(login: $owner) {
+    projectV2(number: $number) {
+      url
+      items(first: 100) {
+        nodes {
+          status: fieldValueByName(name: "Status") {
+            ... on ProjectV2ItemFieldSingleSelectValue { name updatedAt }
+          }
+          content {
+            ... on Issue {
+              number title url state
+              repository { nameWithOwner }
+              labels(first: 20) { nodes { name } }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+BOARD_DONE_DAYS = 7       # Done cards older than this are history, not context
+
+
+def fetch_board(board):
+    """The factory board: every card not Done, plus cards Done in the last week.
+    `since` is when the card moved into its current column, which is what
+    "moved since you last looked" and "stuck in In Progress" are measured from."""
+    data = gh("api", "graphql", "-f", f"query={BOARD_QUERY}",
+              "-F", f"owner={board['owner']}", "-F", f"number={board['number']}")
+    project = data["data"]["user"]["projectV2"]
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=BOARD_DONE_DAYS)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ")
+    cards = []
+    for item in project["items"]["nodes"]:
+        c, st = item["content"], item["status"]
+        if not c or not c.get("number"):      # draft notes and PR cards: not tracked here
+            continue
+        status = st["name"] if st else "No status"
+        since = st["updatedAt"] if st else None
+        if status == "Done" and (since or "") < cutoff:
+            continue
+        labels = [l["name"] for l in c["labels"]["nodes"]]
+        cards.append({
+            "title": c["title"].strip(),
+            "url": c["url"],
+            "repo": c["repository"]["nameWithOwner"],
+            "ref": f"#{c['number']}",
+            "status": status,
+            "since": since,
+            "closed": c["state"] != "OPEN",
+            "needs_human": "needs-human" in labels,
+            "size": next((l[5:] for l in labels if l.startswith("size:")), None),
+        })
+    return {"url": project["url"], "cards": cards}
+
+
 def discover(cfg):
     """Repos to show: recently pushed ones plus pins, minus hides, most recent first."""
     overrides = {r["repo"]: r for r in cfg.get("repos", [])}
@@ -255,6 +316,7 @@ def main():
         "spark_days": cfg["spark_days"],
         "days": cfg["days"],
         "repos": repos_out,
+        "board": fetch_board(cfg["board"]) if cfg.get("board") else None,
     }
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     tmp = OUT_PATH + ".tmp"
