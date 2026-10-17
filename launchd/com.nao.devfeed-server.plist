@@ -5,7 +5,7 @@
     <key>Label</key>
     <string>com.nao.devfeed-server</string>
 
-    <!-- Serves ~/Nao/devfeed (index.html + feed.json) on the tailnet only.
+    <!-- Serves ~/Nao/external/devfeed/public (index.html + feed.json) on the tailnet only.
          Bound to the Tailscale IP, so nothing on the LAN or internet can
          reach it. If Tailscale is down at boot the bind fails and launchd
          retries (ThrottleInterval) until it comes up. -->
@@ -18,7 +18,7 @@
         <string>--bind</string>
         <string>100.118.35.80</string>
         <string>--directory</string>
-        <string>/Users/rubenmacmini/Nao/devfeed</string>
+        <string>/Users/rubenmacmini/Nao/external/devfeed/public</string>
     </array>
 
     <key>KeepAlive</key>
@@ -28,7 +28,7 @@
     <integer>60</integer>
 
     <key>WorkingDirectory</key>
-    <string>/Users/rubenmacmini/Nao/devfeed</string>
+    <string>/Users/rubenmacmini/Nao/external/devfeed/public</string>
 
     <key>StandardOutPath</key>
     <string>/Users/rubenmacmini/Nao/logs/devfeed-server.out</string>

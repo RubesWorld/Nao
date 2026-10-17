@@ -441,32 +441,31 @@ factory opens PRs on its own. At
 **http://100.118.35.80:8300** (tailnet only — the port is bound to the
 Tailscale IP, so nothing on the LAN or internet can reach it).
 
-- **`com.nao.devfeed`** — every 5 min, `scripts/devfeed.py`. Deterministic
-  Python, no LLM: polls GitHub via the `gh` CLI (keyring auth) for recent
-  commits and merged PRs per watched repo, plus open PRs (with check and
-  review state) and branches with commits in the last 7 days but no PR yet
-  (one GraphQL call per repo; a branch with any PR, even merged, is left
-  out, as is the `review-media` branch /ship writes GIFs to), plus the
-  AI-Factory project board from `board` in the config (cards not Done, and
-  Done in the last 7 days, each with when it entered its column), and regenerates
-  `devfeed/feed.json` **wholesale** each run — stateless on purpose, so there
-  is no dedupe bookkeeping to corrupt. On any fetch failure it leaves the old
-  feed in place rather than writing a partial one; the dashboard shows
-  "updated Xm ago" and turns it red past 20 min, so a dead collector is
-  visible on the page itself. Squash and merge commits that duplicate a PR's
-  own entry are folded into it; the sparkline counts every commit regardless.
-- **The page leads with catch-up.** A "since you last looked" line counts
-  merges, pushes, new PRs, active branches and board moves since the last
-  visit, and marks those rows with a blue edge. "Last visit" is stored in the
-  browser's localStorage, so it is per device; it moves when the tab has been
-  hidden for 30 minutes or on "Mark all seen". Below it: the factory board
-  (column counts, cards furthest along first, `needs-human` on top), open PRs
-  and branches. Age flags dim and mark PRs open 7+ days, branches quiet 3+
-  days, and cards in In Progress or Review for 3+ days.
+- **The code lives upstream, in the open-source
+  [RubesWorld/devfeed](https://github.com/RubesWorld/devfeed)** (`~/Code/devfeed`).
+  Nao runs a **pinned release** of it from `external/devfeed` (gitignored) and
+  keeps only its wiring: `config/devfeed.json`, `config/devfeed.version`,
+  `scripts/devfeed-run.sh` and the two plists. Rule: **upstream first, never
+  patch in place.** A change anyone could use (or a bug) goes to devfeed →
+  tag a release → bump `config/devfeed.version` in a Nao PR; the next run
+  checks the new tag out (logged as `devfeed: now on vX`). Only Nao-specific
+  settings go in Nao's config. Plan and reasoning:
+  `plans/devfeed-newsletter.md`.
+- **`com.nao.devfeed`** — every 5 min, `scripts/devfeed-run.sh` → `devfeed.py
+  collect`. Deterministic Python, no LLM: polls GitHub via the `gh` CLI
+  (keyring auth) for recent commits and merged PRs per watched repo, open PRs
+  (check and review state), branches with commits in the last 7 days but no
+  PR (`ignore_branches` drops /ship's `review-media`), and the AI-Factory
+  board from `board` in the config. It regenerates
+  `external/devfeed/public/feed.json` **wholesale** each run; on any fetch
+  failure the old feed stays and the page's "updated Xm ago" turns red. Its
+  `devfeed: ...` lines land in `logs/tasks.log`.
+- **The page leads with catch-up:** "since you last looked" counts (per
+  device, localStorage), open PRs and branches, then the board, with age
+  flags for stale PRs, quiet branches and stuck cards.
 - **`com.nao.devfeed-server`** — KeepAlive daemon, plain
-  `python3 -m http.server` serving `~/Nao/devfeed/` (index.html is tracked in
-  git; feed.json is generated and gitignored). If Tailscale is down at boot
-  the bind fails and launchd retries every 60s until it comes up.
+  `python3 -m http.server` serving `~/Nao/external/devfeed/public/`. If
+  Tailscale is down at boot the bind fails and launchd retries every 60s.
 - **Watched repos are discovered, not listed.** Every non-archived,
   non-fork repo of `owner` pushed within `active_days` (14) shows up on its
   own, most recent first, and drops off after two quiet weeks. A new project

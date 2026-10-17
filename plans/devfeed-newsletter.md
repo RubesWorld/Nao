@@ -1,6 +1,6 @@
 # Dev feed newsletter — a daily re-entry email
 
-**Status:** ⏳ planned (2026-10-16). Not started.
+**Status:** 🔨 in progress. Step 1 done 2026-10-17; step 4 (next up) next.
 **Pointer from:** `blueprint.md`, roadmap item 11.
 
 ## Why
@@ -104,13 +104,13 @@ Nao is already a public repo, so the split isn't public versus private. It's
 **a generic tool** versus **Ruben's wiring**. The rule: **upstream-first, never
 fork-and-patch.**
 
-- **New repo `RubesWorld/devfeed`** is the single source of truth for the
+- **`RubesWorld/devfeed`** (public, MIT, created 2026-10-15) is the single source of truth for the
   collector, the summarizer, delivery, the dashboard and their tests. Nothing
   personal lives there: no repo lists, emails, Tana IDs or board numbers.
   Everything personal comes from a config file.
-- **Nao consumes it as a pinned dependency**, for example
-  `pip install git+https://github.com/RubesWorld/devfeed@v0.3.0` into a venv,
-  or a pinned checkout under `external/`. Nao keeps only:
+- **Nao consumes it as a pinned dependency**: a checkout of a release tag in
+  `external/devfeed`, version in `config/devfeed.version`, kept in step by
+  `scripts/devfeed-run.sh`. Nao keeps only:
   - its config (`config/devfeed.json`: which repos, display names, colours,
     the email address, schedule)
   - its launchd plists
@@ -131,15 +131,18 @@ fork-and-patch.**
 
 ## Order of work
 
-1. **Extract first.** Move `devfeed.py`, `index.html` and their tests into
-   `RubesWorld/devfeed` with no behaviour change, and have Nao run it from the
-   pinned version. The feed and dashboard must look identical afterwards.
+1. ✅ **Extract first** (2026-10-17). The repo already existed and was ahead of
+   Nao's copy, so this was a switch: Nao runs `v0.1.0` from `external/devfeed`,
+   and its own `scripts/devfeed.py` and `devfeed/index.html` are gone. The
+   upstream collector produced the same repos, items, PRs and cards from Nao's
+   config before switching.
 2. **Generalise sources and config** (github core, board and PLAN.md optional).
 3. **Build the digest renderer plus email sink** upstream, plain version first.
 4. **Next-up ranking** (deterministic) in the digest and the dashboard.
 5. **Add the optional summarizer**, including backlog clustering.
 6. **Nao turns on the morning email** through config and a launchd plist.
-7. README, license (MIT or Apache-2.0), example config, then announce.
+7. README updates for the new parts, then announce. (MIT license, README and
+   example config already exist upstream.)
 
 Steps 1 and 2 before 3 matter: building the newsletter inside Nao first would
 mean porting it later, which is exactly the drift this split is meant to avoid.
@@ -150,4 +153,3 @@ mean porting it later, which is exactly the drift this split is meant to avoid.
 - Send time, and whether weekends get one.
 - Where PLAN.md is read from: local checkouts in `~/Code`, the factory work
   dirs, or the branch on GitHub (works without local clones).
-- License choice.
