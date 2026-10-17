@@ -7,7 +7,6 @@
 
 import Cocoa
 
-let displayID = "143821D7-3209-4C2A-9E49-97A60D350718"
 let displayplacer = "/opt/homebrew/bin/displayplacer"
 
 struct Mode {
@@ -19,7 +18,7 @@ struct Mode {
 
 let modes = [
     Mode(label: "Desk",
-         detail: "Desk — 3440×1440 @ 50Hz",
+         detail: "Desk — 3440×1440 @ 100Hz",
          resolution: "3440x1440",
          command: "/opt/homebrew/bin/deskmode"),
     Mode(label: "Remote",
@@ -43,13 +42,15 @@ func run(_ path: String, _ args: [String] = []) -> String {
 }
 
 /// The display's live resolution, e.g. "1440x900". nil if displayplacer can't
-/// see the display at all (unplugged, or Homebrew moved).
+/// see a display at all (unplugged, or Homebrew moved).
 func currentResolution() -> String? {
+    // The Mini drives one monitor, so the first screen block is the one. No
+    // hardcoded id: macOS gives every new monitor a new one, and pinning it
+    // broke the menu when the 34" was swapped for the Samsung.
     let listing = run(displayplacer, ["list"])
-    guard let idEnd = listing.range(of: displayID)?.upperBound else { return nil }
     // Per-screen block prints "Resolution:" before the "mode N: res:..." list,
-    // so the first match after the id is the live one.
-    for line in listing[idEnd...].split(separator: "\n") {
+    // so the first match is the live one.
+    for line in listing.split(separator: "\n") {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         if trimmed.hasPrefix("Resolution:") {
             return String(trimmed.dropFirst("Resolution:".count)).trimmingCharacters(in: .whitespaces)
