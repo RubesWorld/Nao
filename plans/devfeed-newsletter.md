@@ -32,8 +32,59 @@ missing is turning it into something a person reads, and delivering it.
     `needs-human` cards
 - **While you were away:** what the factory did since the last email (specs
   drafted, PRs opened, jobs stopped and why).
+- **Next up (building blocks):** per repo, which card to build next and why,
+  judged by what it unblocks rather than how appealing the feature is. See
+  the section below.
 - **Short by design.** Quiet repos aren't listed. No stats. If nothing needs
   you, the whole email is one line saying so.
+
+## Next up: building-block recommendations
+
+Feature value is the owner's call, and the Ready column order already
+expresses it. What's hard to see from the board is **structure**: which card
+is a foundation others stand on, and which cards will collide. The digest
+answers "what should go next so the rest gets easier", per repo.
+
+**Inputs** (all already on the board since 2026-10-17, when the spec runner
+started writing them into every spec):
+- `## Depends on`: explicit edges between cards
+- `## Touches`: the files and directories each spec changes
+- status, `size:*`, `risk:*`, `needs-human`, open questions
+- open PRs and in-progress branches, from the existing collector
+
+**How it ranks** (deterministic, no LLM needed):
+1. **Unblocks the most.** Count the cards that depend on it, directly or
+   through a chain. A card that three others wait on beats a standalone one.
+2. **Foundation-ness.** Shared paths that many specs touch (schema and
+   migrations, auth, shared components, the data layer) mark a card as
+   groundwork. Building it first means the others rebase onto it once,
+   instead of colliding with each other.
+3. **Ready to go.** Its dependencies are merged, there are no open questions
+   and no `needs-human`. A blocked card is listed by what it's waiting on,
+   never recommended.
+4. **Cheap first on ties.** Size s before m. `risk:*` cards are never
+   auto-recommended to the factory; they show as "needs you".
+
+**Output, per repo, three lines at most:**
+- **Build next:** #N, with the reason (for example "unblocks #12 and #15;
+  lays the `connections` table they both read")
+- **Don't run together:** pairs in Ready or In Progress whose Touches
+  overlap, so they shouldn't be built in parallel
+- **Backlog cluster:** when several backlog ideas sit on the same missing
+  foundation, name it as the one to promote and spec first. Backlog cards
+  have no Touches yet, so this part is an optional LLM pass (layer 2) that
+  groups backlog titles by the code they'd need.
+
+**Where it's used:**
+- the morning email and the dashboard
+- the factory, later and optionally: the build runner takes Ready cards in
+  board order, so the recommendation stays advice. The owner drags the card
+  up. An "auto-order Ready by building blocks" mode can come once the
+  recommendations have proven sensible for a few weeks.
+
+**Open source:** generic, as long as the field names are configurable
+(`depends_on_heading`, `touches_heading`). The ranking belongs upstream in
+`devfeed` as part of the GitHub Projects board source.
 
 ## Architecture (three layers, so it can be open sourced)
 
@@ -85,9 +136,10 @@ fork-and-patch.**
    pinned version. The feed and dashboard must look identical afterwards.
 2. **Generalise sources and config** (github core, board and PLAN.md optional).
 3. **Build the digest renderer plus email sink** upstream, plain version first.
-4. **Add the optional summarizer.**
-5. **Nao turns on the morning email** through config and a launchd plist.
-6. README, license (MIT or Apache-2.0), example config, then announce.
+4. **Next-up ranking** (deterministic) in the digest and the dashboard.
+5. **Add the optional summarizer**, including backlog clustering.
+6. **Nao turns on the morning email** through config and a launchd plist.
+7. README, license (MIT or Apache-2.0), example config, then announce.
 
 Steps 1 and 2 before 3 matter: building the newsletter inside Nao first would
 mean porting it later, which is exactly the drift this split is meant to avoid.
