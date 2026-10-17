@@ -7,7 +7,11 @@
   "active_days": 14,
   "hide": [],
   "ignore_branches": ["review-media"],
-  "board": { "owner": "RubesWorld", "number": 1 },
+  "board": {
+    "owner": "RubesWorld", "number": 1,
+    "count_only_columns": ["Backlog"],
+    "next_up": { "columns": ["Spec'd", "Ready"], "hold_labels": ["risk:", "spec:needs-answers"] }
+  },
   "repos": [
     { "repo": "RubesWorld/Nao", "display": "Nao", "slot": 1, "pin": true },
     { "repo": "RubesWorld/health-hq", "display": "Health HQ", "slot": 3 },
