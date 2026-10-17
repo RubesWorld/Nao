@@ -5,12 +5,14 @@
     <key>Label</key>
     <string>com.nao.devfeed</string>
 
-    <!-- Collector: polls GitHub (gh keyring auth) and regenerates
-         devfeed/feed.json. Stateless — safe to run any time. -->
+    <!-- Collector: runs the pinned RubesWorld/devfeed release from
+         external/devfeed (scripts/devfeed-run.sh), which polls GitHub (gh
+         keyring auth) and regenerates external/devfeed/public/feed.json.
+         Stateless — safe to run any time. -->
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
-        <string>/Users/rubenmacmini/Nao/scripts/devfeed.py</string>
+        <string>/bin/bash</string>
+        <string>/Users/rubenmacmini/Nao/scripts/devfeed-run.sh</string>
     </array>
 
     <key>StartInterval</key>

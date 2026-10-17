@@ -8,4 +8,3 @@ external/
 .playwright-mcp/
 __pycache__/
 models/
-devfeed/feed.json
