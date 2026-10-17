@@ -96,6 +96,11 @@ else
   END_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   REASON="exit=$EXIT"
   [[ $EXIT -eq 124 ]] && REASON="timed out after ${TIMEOUT_SECS}s"
+  # claude prints auth errors to stdout, so they land in $OUTPUT, not the log.
+  # Name them: an expired login fails every job until someone logs back in.
+  if [[ -f "$OUTPUT" ]] && grep -qiE 'failed to authenticate|oauth|not logged in|/login|invalid api key' "$OUTPUT"; then
+    REASON="claude auth expired, exit=$EXIT — run \`claude\` on the mini to log back in"
+  fi
   echo "[$END_TIMESTAMP] END   $TASK_NAME (FAILED, $REASON)" >> "$LOG"
   # Park partial output so the skip-check above doesn't block a retry today.
   [[ -f "$OUTPUT" ]] && mv "$OUTPUT" "${OUTPUT}.failed"
