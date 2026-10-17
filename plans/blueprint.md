@@ -294,6 +294,12 @@ Rough priority order:
       snooze, quick capture via import_tana_paste
    Constraint: a page declaring `mcp` cannot be shared publicly (it is a
    viewer-consented credential grant) — correct for a personal cockpit.
+11. **Dev feed newsletter** ⏳ (planned 2026-10-16): a morning re-entry email
+    built from the dev feed: per project, where you left off, the next action,
+    what's waiting on you, plus what the factory did overnight. The dev feed is
+    extracted to a public `RubesWorld/devfeed` repo first, and Nao consumes it
+    pinned (upstream-first, never fork-and-patch). Full plan:
+    `plans/devfeed-newsletter.md`.
 10. Future extensions still parked: Gmail triage in the morning briefing,
     GitHub Actions cloud layer for non-Tana tasks, Govee signals, voice
     memo pipeline, #prospect BD layer.
@@ -316,3 +322,4 @@ Rough priority order:
 | 2026-08-20 | **Bridge allowlist widened by decision** (PR #2): + WebSearch/WebFetch (phone lookups; exfil caveat accepted for a personal threat model) and Nao's own scripts (watcher, health-check) by explicit command. The invariant that stays: leaked bot token ≠ shell — no arbitrary Bash, no Write/Edit, no .env/keys. |
 | 2026-08-20 | **Inbox triage loop built** (PR #2, stacked on #1): morning briefing counts Capture Inbox items; bridge `triage` command proposes routing (articles → #resource with fetched Key takeaways, ideas → #idea Raw, to-dos → #Task) via the cleanup-style propose/confirm flow. Closes the "inbox is a dead letter box" gap — capture is Ruben's only job, filing is Nao's. WebFetch granted ONLY to the fixed triage-execute prompt, never freeform. |
 | 2026-08-20 | **Substrate question reopened, decision deferred.** Past Tana frustration largely = access friction (desktop-only, search-node pain), which the hosted MCP + connector + Nao HQ may remove. Experiment: live with the new access for 2–4 weeks, then decide. Keep-Tana signals: memory retrieval works through the new surfaces and direct-Tana visits stop feeling necessary. Leave-Tana signals: still fighting the tool with full access, or paying for features Nao alone uses. Every access path already goes through a thin tool layer (MCP tools, tana_client), so a future migration is tractable either way — no need to decide from old frustration. |
+| 2026-10-16 | **Dev feed newsletter planned** (`plans/devfeed-newsletter.md`): a daily morning re-entry email for context switching. The dev feed becomes its own open-source repo (`RubesWorld/devfeed`) as the single source of truth; Nao keeps only config, launchd and personal plugins, and pins a released version. Extraction comes before any newsletter work, so nothing has to be ported later. |
