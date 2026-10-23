@@ -42,7 +42,7 @@ AMBIENT_MAX_GAP_HOURS = {
 SPECIAL = {"com.nao.watcher", "com.nao.telegram-bridge",
            "com.nao.health-check", "com.nao.calendar-capture",
            "com.nao.bluebubbles", "com.nao.display-menu",
-           "com.nao.devfeed", "com.nao.devfeed-server",
+           "com.nao.devfeed", "com.nao.devfeed-server", "com.nao.devfeed-digest",
            "com.nao.checkin-capture", "com.nao.checkin-nudge"}
 
 

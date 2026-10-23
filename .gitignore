@@ -8,3 +8,7 @@ external/
 .playwright-mcp/
 __pycache__/
 models/
+config/digest-state.json
+config/digest-state.json.*.tmp
+config/devfeed.local.json
+config/devfeed.digest.json
