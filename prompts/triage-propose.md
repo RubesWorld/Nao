@@ -26,6 +26,11 @@ Capture Inbox node: `drg2JUfK3f-A_CAPTURE_INBOX`
 
 # Hard rules
 
+- Skip any child tagged `nightly-checkin` (tag `sbiN1DKnMwvg`) entirely: no
+  proposal, not even `keep`. Those are Ruben's voice check-ins.
+  `scripts/checkin-capture.py` files each one and moves it out of the
+  Inbox within about half an hour.
+
 - ONLY children of the Capture Inbox. Never propose anything for nodes
   elsewhere in the workspace, whatever you notice along the way.
 - Items that already carry a supertag were filed deliberately — propose

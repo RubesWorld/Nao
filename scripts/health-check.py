@@ -33,7 +33,8 @@ WATCHER_MAX_GAP_HOURS = 3   # hourly job; allow some sleep slack
 # keyed by how often it is supposed to fire.
 AMBIENT_MAX_GAP_HOURS = {
     "watcher": WATCHER_MAX_GAP_HOURS,
-    "calendar-capture": 30,   # nightly at 21:30, plus slack for a sleeping mini
+    "calendar-capture": 30,   # nightly at 22:00, plus slack for a sleeping mini
+    "checkin-capture": 3,     # every 15 min (nudge logs under this name too)
     "devfeed": 3,             # every 5 min; slack for a sleeping mini
 }
 
@@ -41,7 +42,8 @@ AMBIENT_MAX_GAP_HOURS = {
 SPECIAL = {"com.nao.watcher", "com.nao.telegram-bridge",
            "com.nao.health-check", "com.nao.calendar-capture",
            "com.nao.bluebubbles", "com.nao.display-menu",
-           "com.nao.devfeed", "com.nao.devfeed-server"}
+           "com.nao.devfeed", "com.nao.devfeed-server",
+           "com.nao.checkin-capture", "com.nao.checkin-nudge"}
 
 
 def expected_runs(plist_path, window_days):
