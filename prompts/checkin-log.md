@@ -16,6 +16,12 @@ The check-in arrives as JSON at the end of this prompt: `nodeId`,
 **Date**, **Who I saw**, **What I did**, **Tasks**, **Promises**,
 **People news**, **Anything else**. Any of them may be empty.
 
+The fields may be empty and the day may be in plain text instead: a
+transcript child under the node, or text Ruben dictated straight into it.
+Treat that free-form text as the source and pull the same categories out of
+it yourself. If both are present, the fields win and the free text fills
+gaps.
+
 **The day.** Use `fallbackDate`, the day computed from when the check-in was
 recorded (a check-in made after midnight counts for the day before). Only
 override it if the Date field shows an explicit calendar date that differs,
