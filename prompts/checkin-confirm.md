@@ -42,6 +42,18 @@ Append a child line under the Person's **Notes** field (`QUwmlIpeAfCm`):
 date with its own field (Birthday `LneKNR9MAoEt`, Location `NcIOJEIxEhW3`),
 set that field instead, but only if it is empty.
 
+# new-area
+
+Create the area under the home node `xAJR7-Msy1YZ`:
+
+```
+- <Name> #[[^9Ng9O5zV815c]]
+  - [[^9pd_NF_F8PBd]]:: <why, from the item>
+```
+
+Then for each id in `activityNodeIds`, set that activity's **Area**
+(`K-t41yQb4_tH`) to the new area.
+
 # fact
 
 Create under the home node `xAJR7-Msy1YZ`, where the existing facts live:

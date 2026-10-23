@@ -53,6 +53,29 @@ Run these searches and inspect results:
 
    State the rate plainly: "3 of 5 proposals answered", "1 condition auto-snoozed after 3 alerts". Do not editorialise about his follow-through — this section audits *Nao*, not Ruben. The failure mode of the whole ambient layer is notification fatigue, and the only way to see it coming is to count what got ignored.
 
+9. **Where the time went** — Ruben tracks his hobbies and work by area, from
+   his nightly check-ins.
+
+   - Activities: `search_nodes` with `hasType: "ECnN25sK8yg8"` and
+     `compare: { fieldId: "ljphwZDMQV-0", operator: "gt", value: <TODAY minus 7 days>, type: "date" }`.
+     Use the server-side compare; dates rendered by `read_node` come back as
+     "Yesterday" or "Mon, Oct 19" and are not reliable to parse. Read each
+     node for its Area.
+   - Hangouts: `#interaction` (`1y3M8tt6ahGs`) with Date (`qTyT3tLoop87`)
+     in the same window. These count toward **Relationship**. They are never
+     activities, so nothing is counted twice.
+   - Count **distinct days** per area, not nodes. Two TikToks on Tuesday is
+     one Content creation day. Add hours only where the activity has Hours
+     set, and never estimate them.
+   - **Gone quiet:** for each area with activity in the last 60 days but none
+     in the last 7, find its most recent activity date (same compare, wider
+     window). Flag it as "no <area> in N days". Areas never tracked are not
+     quiet; skip them.
+   - If there are no activities at all this week, check whether any
+     `#nightly-checkin` (`sbiN1DKnMwvg`) exists in the window. If none, say
+     "no check-ins this week" rather than reporting zeros, which would read
+     as a week of doing nothing.
+
 # Step 4: Write the review to Tana
 
 Get this week's daily note via `get_or_create_calendar_node`. `import_tana_paste` under it. Tag `#[[^4utYKeS9qOH-]]`:
@@ -71,6 +94,10 @@ Body sections (omit empty ones):
 - **Lingering ideas** — count of Raw ideas, list top 3 by date created (oldest first)
 - **Long-open promises** — count of promises older than 30 days still open
 - **Alerting health** — how Nao's own interruptions landed. Answer rate on proposals, any condition that exhausted the ladder and auto-snoozed, anything dropped, any undo. If a condition has now fired three times without resolving, say so and name it: it should either change shape or be dropped. Omit the section only if nothing was ever sent.
+- **Where the time went** — one line, areas by days, most first, e.g.
+  `AI building 5 days · Fitness 4 · Content creation 2 · Relationship 3 hangouts`.
+  Then one line per quiet area ("No Content creation in 9 days"). Report
+  only: no judgement about which area deserves more time.
 - **This week's recommendation** — your single highest-priority "do this" for the upcoming week, based on the data. One sentence.
 
 Keep under 50 lines. Be specific. No filler.
@@ -88,6 +115,9 @@ Print 3-5 lines. Lead with most actionable. Examples:
 ```
 🗓️ Clean week — nothing rotting. Keep going.
 ```
+
+If there was activity, add the time line as one of the lines:
+`🕒 AI building 5d · Fitness 4d · Content 2d · 3 hangouts`.
 
 Rules:
 - Specific names beat counts

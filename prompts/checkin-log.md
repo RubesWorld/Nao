@@ -136,11 +136,50 @@ DAY's daily note:
   append the promise text to that interaction's **Promises made**
   (`hZZSWiuUxHvQ`).
 
-# 5. What I did / Anything else
+# 5. Activities — from "What I did"
 
-Do not create nodes for these. They stay on the check-in node itself, which
-the caller files under the day. Ideas, decisions and durable facts here are
-proposals (section 6), not writes.
+Ruben tracks where his time goes, by area. Each thing he spent time on
+becomes one `#activity` (tag `ECnN25sK8yg8`) under DAY's daily note:
+
+```
+- <what he did, short, his words> #[[^ECnN25sK8yg8]]
+  - [[^K-t41yQb4_tH]]:: [[Area name^areaId]]
+  - [[^ljphwZDMQV-0]]:: DAY
+  - [[^cONPK2LVCfaJ]]:: [[Project^projectId]]
+  - [[^8Jtl5GtZm5ed]]:: <hours, only if he said how long>
+```
+
+**Areas.** List them once with `search_nodes` `hasType: "9Ng9O5zV815c"`
+(skip anything in the trash). Map by meaning, not keywords:
+
+- made a video, edited, posted on TikTok or Instagram, filmed, wrote a
+  script → **Content creation**
+- worked on his AI bots, Nao, the dev feed, coding side projects, Home
+  Assistant → **AI building**
+- gym, run, workout, class at the gym → **Fitness**
+- his job, "worked", meetings for work → **Career**
+- the other existing areas when they clearly fit
+
+**Project** only when he clearly named an active project
+(`hasType: "Wgx1yMsS_LcO"`): "worked on Nao" → Nao Build. Otherwise omit it.
+
+**Hours** only when he said a duration. Never estimate: the review counts
+days, and a guessed number would quietly distort it.
+
+Rules:
+
+- Hanging out with people is an **interaction** (section 2), never an
+  activity, or it gets counted twice. Dropping tools off at Wyatt's is part
+  of the hangout.
+- One activity per area per day: "edited a video and posted it" is one
+  Content creation activity, not two.
+- Errands and chores (laundry, groceries) are not activities. Skip them.
+- Something that clearly belongs to a recurring pursuit with **no matching
+  area** (sewing, say): create the activity with Area empty and add a
+  `new-area` proposal (section 6). Never create an area yourself.
+
+**Anything else** creates no nodes. It stays on the check-in node. Ideas,
+decisions and durable facts in it are proposals (section 6), not writes.
 
 # 6. Proposals — things Ruben confirms first
 
@@ -156,6 +195,10 @@ Never write these. List them in the JSON output for Ruben to confirm:
   "birthday is May 1"). Include `personId`, `name`, `update`. One-off news
   from the evening itself already went into Their updates; this is for what
   should live on the Person node.
+- `new-area` — a recurring pursuit with no area yet. Include `name` (short:
+  "Sewing"), `why` (what he did that suggested it), and `activityNodeIds`
+  for the activities you left without an Area, so they can be assigned
+  once confirmed.
 - `fact` — a durable fact about Ruben himself (a move, a new account, a
   health change). Include `text` and `category` (Personal, Health, Finance,
   Location, Relationships, Accounts, Memberships).
@@ -166,13 +209,16 @@ ignored wholesale.
 # Output
 
 First, one short line per thing you wrote or flagged, plain text, no
-preamble:
+preamble. Activities go on one combined 🕒 line. Say nothing about skipped
+chores or about your own read-backs and checks; Ruben reads this on his
+phone and only needs the outcome:
 
 ```
 ✅ Dinner with Chloe — Oct 22 (interaction, Vibe Great, Last interaction updated)
 ➕ Added Their updates to Catan night — Oct 22 (already logged by calendar)
 ✅ Task: Book flights to Madrid (due Oct 24)
 ✅ Promise to Wyatt: send cabin photos (by Oct 26)
+🕒 Content creation: posted on TikTok · AI building: worked on Nao · Fitness: gym
 ⚠️ Promise to Sam has no deadline. Set one or it won't surface
 ⚠️ Two people match "Chris". Left off Attendees
 ```
@@ -188,7 +234,8 @@ Then a single fenced ```json block, the last thing you print:
    {"kind": "interaction", "nodeId": null, "appendedTo": "def456",
     "title": "Catan night — Oct 22", "people": []},
    {"kind": "task", "nodeId": "ghi789", "title": "Book flights to Madrid", "people": []},
-   {"kind": "promise", "nodeId": "jkl012", "title": "Send Wyatt the cabin photos", "people": []}
+   {"kind": "promise", "nodeId": "jkl012", "title": "Send Wyatt the cabin photos", "people": []},
+   {"kind": "activity", "nodeId": "mno345", "title": "Edited and posted a TikTok (Content creation)", "people": []}
  ],
  "proposals": [
    {"kind": "new-person", "name": "Maya Chen", "details": "designer, met at Sam's party",

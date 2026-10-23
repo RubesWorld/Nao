@@ -123,6 +123,11 @@ def describe(p):
         return "%s: %s" % (p.get("name", "?"), p.get("update", ""))
     if kind == "fact":
         return "Fact: %s" % p.get("text", "")
+    if kind == "new-area":
+        line = "New area: %s" % p.get("name", "?")
+        if p.get("why"):
+            line += " — %s" % p["why"]
+        return line
     return "%s: %s" % (kind, json.dumps(p)[:80])
 
 
