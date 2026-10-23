@@ -140,7 +140,7 @@ fork-and-patch.**
 3. **Build the digest renderer plus email sink** upstream, plain version first.
 4. **Next-up ranking** (deterministic) in the digest and the dashboard.
 5. **Add the optional summarizer**, including backlog clustering.
-6. **Nao turns on the morning email** through config and a launchd plist.
+6. ✅ **Nao turns on the morning email** through config and a launchd plist (2026-10-22, devfeed v0.3.0).
 7. README updates for the new parts, then announce. (MIT license, README and
    example config already exist upstream.)
 

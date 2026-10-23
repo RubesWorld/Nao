@@ -512,7 +512,7 @@ Tailscale IP, so nothing on the LAN or internet can reach it).
   [RubesWorld/devfeed](https://github.com/RubesWorld/devfeed)** (`~/Code/devfeed`).
   Nao runs a **pinned release** of it from `external/devfeed` (gitignored) and
   keeps only its wiring: `config/devfeed.json`, `config/devfeed.version`,
-  `scripts/devfeed-run.sh` and the two plists. Rule: **upstream first, never
+  `scripts/devfeed-run.sh`, `scripts/devfeed-digest.sh` and the three plists. Rule: **upstream first, never
   patch in place.** A change anyone could use (or a bug) goes to devfeed →
   tag a release → bump `config/devfeed.version` in a Nao PR; the next run
   checks the new tag out (logged as `devfeed: now on vX`). Only Nao-specific
@@ -533,6 +533,17 @@ Tailscale IP, so nothing on the LAN or internet can reach it).
 - **`com.nao.devfeed-server`** — KeepAlive daemon, plain
   `python3 -m http.server` serving `~/Nao/external/devfeed/public/`. If
   Tailscale is down at boot the bind fails and launchd retries every 60s.
+- **`com.nao.devfeed-digest`** — daily at 07:30, `scripts/devfeed-digest.sh`
+  → `devfeed.py digest`: refreshes the feed and emails `digest.to` (HTML in
+  the page's dark look, plain text as fallback) with what's waiting and what
+  happened since the last email. This repo is public, so the digest settings
+  (address, SMTP user, page link) live in gitignored
+  `config/devfeed.local.json`, merged over `config/devfeed.json` at run time
+  into gitignored `config/devfeed.digest.json`. The window lives in
+  `config/digest-state.json` (gitignored). The SMTP password is a Gmail app
+  password in the login Keychain (`security add-generic-password -s
+  devfeed-smtp -a rubenmacmini -w`), never in the config. A missed morning
+  (Mac asleep) just widens the next window.
 - **Watched repos are discovered, not listed.** Every non-archived,
   non-fork repo of `owner` pushed within `active_days` (14) shows up on its
   own, most recent first, and drops off after two quiet weeks. A new project
