@@ -2,9 +2,10 @@
 """
 Nao nightly check-in — file the day Ruben talked through.
 
-Ruben debriefs his day in Tana's mobile voice chat on a #nightly-checkin
-node (tag sbiN1DKnMwvg). Tana runs the conversation and fills the node's
-fields as plain text. This files them: interactions, tasks, promises and
+Ruben talks through his day in Tana mobile, as a voice memo or a voice chat
+on a #nightly-checkin node (tag sbiN1DKnMwvg). It is his update, not an
+interview: the voice chat only listens. Tana transcribes and fills the
+node's fields as plain text. This files them: interactions, tasks, promises and
 Last interaction are written straight away, because the evidence is his own
 account; new contacts, Person news and facts are proposed on Telegram
 (`add 1,3` / `add all` / `add no`). Policy in checkin_log.py.
@@ -222,8 +223,8 @@ def nudge():
     if any(checkin_day(n["created"]) == today for n in nodes):
         log("nudge: already checked in today")
         return 0
-    send("🌙 Check-in time. In Tana: Capture → nightly-checkin → voice. "
-         "Five minutes, and I'll file the rest.")
+    send("🌙 Check-in time. Tell Tana about your day: a voice memo or "
+         "voice chat on nightly-checkin. Just talk; I'll file the rest.")
     log("nudge: sent")
     return 0
 

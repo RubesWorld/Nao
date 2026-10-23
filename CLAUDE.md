@@ -341,10 +341,12 @@ To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{wa
 
 ## The nightly check-in — talking through the day
 
-Ruben debriefs his day out loud in **Tana's mobile voice chat** on a
-`#nightly-checkin` node (tag `sbiN1DKnMwvg`). Tana runs the conversation from
-the tag's voice greeting and instructions, and when the chat ends it fills
-the fields: Who I saw, What I did, Tasks, Promises, People news, Anything
+Ruben talks through his day in **Tana mobile**, as a voice memo or a voice
+chat on a `#nightly-checkin` node (tag `sbiN1DKnMwvg`). **It is his update,
+not an interview** (his call, 2026-10-22): the voice chat says "go ahead",
+listens, and asks at most one question at the end, only if a name or due
+date is unclear. A memo is the same thing with no voice on the other end.
+Either way Tana transcribes and fills the fields: Who I saw, What I did, Tasks, Promises, People news, Anything
 else. Nao then files it. The calendar knows an evening was planned; the
 check-in is his own account of what happened, which makes it the strongest
 evidence any part of Nao gets.
@@ -379,8 +381,8 @@ Confirmed `add`s have no undo, since he approved each one.
 
 **The tag's fields are plain text on purpose.** Instance fields
 (`Instance of #Task`, `#Person`) would let Tana create bare tasks with no
-Context and duplicate people before Nao ever sees them. Tana talks, Nao
-files. The voice greeting, voice instructions and per-field AI instructions
+Context and duplicate people before Nao ever sees them. Tana transcribes,
+Nao files. The voice greeting, voice instructions and per-field AI instructions
 live on the tag and are editable with the Tana Cloud MCP's
 `set_tag_metadata` / `set_field_metadata`. **Don't use angle-bracket
 placeholders in them:** Tana strips them as HTML.
