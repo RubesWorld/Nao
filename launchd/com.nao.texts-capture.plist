@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nao.texts-capture</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/rubenmacmini/Nao/scripts/texts-capture.py</string>
+    </array>
+
+    <!-- 08:15 daily: count yesterday's real text conversations (Beeper)
+         as contact. Morning, not night, so the whole day (to 04:00) is in
+         and any "link" question arrives when Ruben is awake. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/rubenmacmini/Nao</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/rubenmacmini</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/rubenmacmini/Nao/logs/texts-capture.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rubenmacmini/Nao/logs/texts-capture.err</string>
+</dict>
+</plist>

@@ -332,7 +332,7 @@ Writing to the calendar is the `calendar` skill (`skills/calendar/SKILL.md`) —
 one sentence to a real event. It confirms before anything that reaches other
 people (attendees send real invites) or overwrites an existing event.
 
-To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge,bluebubbles,calendar-capture,checkin-capture,checkin-nudge}.plist`
+To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge,bluebubbles,calendar-capture,checkin-capture,checkin-nudge,texts-capture}.plist`
 
 **To add a new scheduled task:**
 1. Write `~/Nao/prompts/<name>.md` following the morning-briefing pattern
@@ -476,24 +476,49 @@ so it can be checked and reversed. It is append-only: `state/*.json` holds
 current state and gets rewritten, this holds history and never does. Gitignored
 along with the rest of `logs/` — it is runtime data about real people.
 
-## Beeper — comms search (installed, not yet wired)
+## Beeper — texts count as contact
 
-Beeper Desktop 4.3.73 is installed on the mini. It ships a **built-in MCP
-server** at `localhost:23373` bridging Google Messages (SMS and RCS),
-WhatsApp, Signal, Telegram, Slack and a dozen more. That is the same shape as
-tana-local, so it will work from headless `claude -p` under launchd once it
-is live — which is what makes it worth having over a search tool with no MCP.
+Beeper Desktop runs on the mini, signed in, bridging **Google Messages
+(SMS/RCS), WhatsApp and Telegram** (live 2026-10-23). It serves a local API
+and MCP at `localhost:23373` (registered in Claude Code as `beeper`), so any
+interactive session can search Ruben's messages. `plans/blueprint.md` item 5
+has why this replaced Traul; `docs/beeper-setup.md` has setup.
 
-`docs/beeper-setup.md` has the remaining steps; they need a human, because
-they are signing in and pairing a phone by QR. `plans/blueprint.md` item 5
-has why this replaced Traul.
+**The token is read-only, and that is load-bearing.** It is an in-app token
+(Beeper → Settings → Developers, **"Sensitive actions" unchecked**). Beeper's
+OAuth flow ignores a `scope=read` request and issues read+write, so never
+mint one that way: a token that can send would let any confused model text
+people as Ruben. Verify with `/oauth/introspect` (scope must be `read`).
+Tokens **expire after 30 days**; texts-capture warns on Telegram 3 days
+ahead and again if Beeper starts rejecting it.
 
-**It is deliberately not wired to anything autonomous yet** — it is public
-beta, and the rule already applied to Tana's hosted MCP holds: interactive
-first. No autostart plist, no watcher condition, no health-check entry, and
-no scheduled prompt knows it exists. When that changes it needs all four,
-copying the BlueBubbles pattern — a dead chat bridge is silent, and silence
-looks exactly like nobody texting.
+**`com.nao.texts-capture`**, daily 08:15, `scripts/texts-capture.py`, for
+the day before (04:00 rollover, like the check-in). Deterministic Python, no
+model, and **no message text is read or stored**; it counts. A one-on-one
+chat is a **real conversation** when Ruben sent >= 3, they sent >= 3, and
+it changed hands >= 4 times (calibrated on real traffic: it keeps actual
+back-and-forths and drops one-way texts, short codes, bots and "running
+late"). A real conversation moves the linked Person's **Last interaction**
+forward, never back, with both dates in `logs/actions.jsonl`. It writes no
+#interaction node: a node per thread would bury the hangouts, and an empty
+one is exactly what the digest flags as thin. Group chats are skipped for
+now.
+
+Who a chat belongs to is never guessed. An exact (normalised) name match is
+linked automatically; anything else is **proposed once** on Telegram:
+`link 1,3` / `link all` / `link no`, either to a likely Person ("Chris
+Wilson" → Christopher Wilson, middle names ignored) or as a new contact.
+**Whatever he does not pick is remembered as ignored and never asked
+again.** Links live in `state/texts-people.json`, keyed by Beeper chat id.
+To re-ask about a contact, delete its entry there. Logic in
+`scripts/texts_log.py` (shared with the bridge), client in
+`scripts/beeper_client.py`.
+
+No Beeper autostart plist yet: texts-capture says so on Telegram if it
+cannot reach Beeper, which is the alarm that matters for a once-a-day job.
+If Beeper turns out not to survive a reboot, copy the BlueBubbles autostart
+pattern (poll for the process; never `KeepAlive` on `open -a`). The bridge's `claude -p` does
+**not** get Beeper tools: a leaked bot token would then read every message.
 
 **Never enable Beeper's Remote Access.** It exposes the local API to the
 internet, and that API reads every message on every connected network. The
@@ -596,8 +621,8 @@ Consequences worth internalising:
 
 | Changed | Action |
 |---|---|
-| `telegram-bridge.py`, `nao_telegram.py`, `calendar_log.py`, `checkin_log.py`, `nao_audit.py` | `launchctl unload && load com.nao.telegram-bridge.plist`, then check the startup line in `logs/telegram-bridge.log` |
-| `watcher.py`, `tana_client.py`, `calendar-capture.py`, `checkin-capture.py` | nothing — next scheduled run picks it up. Force one to verify rather than waiting. |
+| `telegram-bridge.py`, `nao_telegram.py`, `calendar_log.py`, `checkin_log.py`, `texts_log.py`, `nao_audit.py` | `launchctl unload && load com.nao.telegram-bridge.plist`, then check the startup line in `logs/telegram-bridge.log` |
+| `watcher.py`, `tana_client.py`, `calendar-capture.py`, `checkin-capture.py`, `texts-capture.py`, `beeper_client.py` | nothing — next scheduled run picks it up. Force one to verify rather than waiting. |
 | Any `prompts/*.md` | nothing; read fresh each run |
 | A `.plist` | `launchctl unload && load`, and copy it into `launchd/` so it is tracked |
 

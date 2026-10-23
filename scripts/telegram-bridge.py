@@ -37,6 +37,7 @@ import calendar_log                              # noqa: E402
 import nao_audit                                 # noqa: E402
 import interaction_note                          # noqa: E402
 import checkin_log                               # noqa: E402
+import texts_log                                 # noqa: E402
 
 NAO = os.path.expanduser("~/Nao")
 STATE_DIR = os.path.join(NAO, "state")
@@ -292,6 +293,10 @@ def callback_to_command(data):
         return "add all"
     if data == "ci:no":
         return "add no"
+    if data == "tx:all":
+        return "link all"
+    if data == "tx:no":
+        return "link no"
     if data == "cal:no":
         # Deliberately not the bare `no` command: tapping Skip on a calendar
         # proposal must not also discard an unrelated pending cleanup.
@@ -569,6 +574,9 @@ def builtin(text):
                 "                — log the calendar hangouts/trips proposed\n"
                 "  add 1,3 / add all / add no\n"
                 "                — add the contacts/facts a check-in proposed\n"
+                "  link 1,3 / link all / link no\n"
+                "                — match texted contacts to people (unpicked\n"
+                "                  ones are never asked about again)\n"
                 "  undo / undo 1 — reverse the last calendar or check-in write\n"
                 "  actions [n]   — what Nao wrote lately, and why\n"
                 "  note …        — add detail to a logged hangout\n"
@@ -626,6 +634,12 @@ def builtin(text):
             return checkin_log.confirm(
                 arg, lambda t: run_claude(t, model="sonnet"))
 
+    # Same guard again: "link me the article" is a request for Nao.
+    if cmd == "link" or cmd.startswith("link "):
+        arg = cmd[len("link"):].strip()
+        if re.fullmatch(r"(all|\*|no|none|skip|[\d,\s]*)", arg):
+            return texts_log.confirm(arg)
+
     if cmd in ("no", "cancel", "nevermind", "never mind"):
         # A bare "no" may be answering either proposal, so clear both rather
         # than guess. Declining everything pending is never the wrong reading
@@ -641,6 +655,8 @@ def builtin(text):
             replies.append(execute_calendar("no"))
         if checkin_log.has_pending():
             replies.append(checkin_log.confirm("no", None))
+        if texts_log.has_pending():
+            replies.append(texts_log.confirm("no"))
         if replies:
             return "\n".join(replies)
         return None   # not answering a proposal — let Claude handle it
@@ -1030,7 +1046,7 @@ def main():
             # Most builtins are instant, but cleanup/do call Claude and can
             # take a minute. A silent gap reads as broken, so ack those too.
             lowered = text.strip().lower()
-            if (lowered.startswith(("cleanup", "triage", "do ", "log ", "add "))
+            if (lowered.startswith(("cleanup", "triage", "do ", "log ", "add ", "link "))
                     or lowered.startswith("note ")
                     or lowered in ("do", "log", "undo", "note")):
                 send(token, chat_id, "on it…")

@@ -16,10 +16,23 @@ though; see "Deliberately not wired" at the bottom.**
 
 ## State
 
-Beeper Desktop **4.3.73 is installed** at `/Applications/Beeper Desktop.app`
-(signed by Automattic, `com.automattic.beeper.desktop`). Nothing else is done
-— the remaining steps need a human because they involve logging in and
-pairing a phone.
+**Done 2026-10-23.** Signed in; Google Messages, WhatsApp and Telegram
+connected; API on; registered with Claude Code as `beeper` using a read-only
+in-app token. Wired to `com.nao.texts-capture` (see CLAUDE.md, "Beeper —
+texts count as contact"). The steps below are kept for re-setup and for the
+monthly token renewal.
+
+**Two things learned doing it:**
+
+- **Beeper's OAuth flow ignores `scope=read`.** A PKCE login asking for
+  `read` came back `read write`, so a token that could send messages as
+  Ruben. It was revoked. Only an in-app token with **"Sensitive actions"
+  unchecked** is read-only. Always check: `POST /oauth/introspect` must say
+  `"scope": "read"`, and a send attempt must return 403 `missing: write`.
+- **Tokens expire after 30 days**, with no refresh. Renew in
+  Settings → Developers, then `claude mcp remove beeper -s user` and add it
+  again (step 4). texts-capture warns 3 days ahead.
+- `/v1/messages/search` caps `limit` at 20 (anything larger is a 400).
 
 ## Steps (on the Mac mini)
 
@@ -60,8 +73,8 @@ Anything other than `000` means it is listening.
 claude mcp add beeper http://localhost:23373/v0/mcp -t http -s user
 ```
 
-OAuth is handled in-app. If it asks for a token instead, create one in
-Settings → Developers and append
+Do **not** use the OAuth prompt (it grants write). Create a token in
+Settings → Developers with "Sensitive actions" unchecked and append
 `-H "Authorization: Bearer <TOKEN>"`.
 
 Then confirm:
@@ -78,25 +91,14 @@ headless, `read_node` rendering `**Label**: value` instead of `Label:: value`,
 and dates arriving as `Mon, Jun 1`. Make a real query, read the real response,
 then write code.
 
-## Deliberately not wired
+## What is wired, and what is not
 
-Beeper is **public beta and self-described as experimental**, so the rule the
-blueprint already applied to Tana's hosted MCP applies here: interactive use
-first, autonomous jobs later.
-
-Specifically, none of this exists yet and none of it should until Beeper has
-proven itself over a few weeks:
-
-- **No `com.nao.beeper` autostart.** BlueBubbles has one because a dead relay
-  is silent and silence is indistinguishable from nobody texting. The same
-  will be true here, and the same polling-script pattern applies — `open -a`
-  returns immediately, so `KeepAlive` would read that as a crash and relaunch
-  forever. Copy `scripts/bluebubbles-autostart.sh` when the time comes.
-- **No watcher condition and no health-check entry.** Add one hourly probe of
-  port 23373 at that point, and add `com.nao.beeper` to the health-check
-  SPECIAL set so it is not run-counted like a prompt job.
-- **Nothing in the scheduled prompts.** The weekly review and the digests do
-  not know Beeper exists.
+Wired: `com.nao.texts-capture` (daily, counts real conversations as
+contact) and its health-check freshness entry. Not wired, deliberately: an
+autostart plist (add one, copying `scripts/bluebubbles-autostart.sh`, if
+Beeper does not survive a reboot), a watcher condition, and any scheduled
+prompt. The Telegram bridge's `claude -p` does not get Beeper tools: a leaked
+bot token would then read every message.
 
 ## Do not enable Remote Access
 
