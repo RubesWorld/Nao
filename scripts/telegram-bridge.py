@@ -36,6 +36,7 @@ from nao_telegram import send as tg_send  # noqa: E402
 import calendar_log                              # noqa: E402
 import nao_audit                                 # noqa: E402
 import interaction_note                          # noqa: E402
+import checkin_log                               # noqa: E402
 
 NAO = os.path.expanduser("~/Nao")
 STATE_DIR = os.path.join(NAO, "state")
@@ -80,6 +81,7 @@ TRANSCRIPT_REPLY_CHARS = 1500   # stored reply excerpt; full reply still sent
 # Ruben's call so the deployed allowlist never feels tight.
 DEFAULT_ALLOWED_TOOLS = [
     "mcp__tana-local",      # all Tana tools — read AND write, Nao's memory
+    "mcp__tana-outliner-local",  # same server, renamed 2026-10-21
     "mcp__monarch-money",   # finance questions
     "Read",
     "Bash(date:*)",         # prompts need today's date
@@ -286,6 +288,10 @@ def callback_to_command(data):
         return "log all"
     if data == "cal:undo":
         return "undo"
+    if data == "ci:all":
+        return "add all"
+    if data == "ci:no":
+        return "add no"
     if data == "cal:no":
         # Deliberately not the bare `no` command: tapping Skip on a calendar
         # proposal must not also discard an unrelated pending cleanup.
@@ -561,7 +567,9 @@ def builtin(text):
                 "                — act on the last proposal\n"
                 "  log 1,3 / log all / no\n"
                 "                — log the calendar hangouts/trips proposed\n"
-                "  undo / undo 1 — reverse the last calendar write\n"
+                "  add 1,3 / add all / add no\n"
+                "                — add the contacts/facts a check-in proposed\n"
+                "  undo / undo 1 — reverse the last calendar or check-in write\n"
                 "  actions [n]   — what Nao wrote lately, and why\n"
                 "  note …        — add detail to a logged hangout\n"
                 "anything else is passed to Nao:\n"
@@ -611,6 +619,13 @@ def builtin(text):
         if re.fullmatch(r"(all|\*|no|none|skip|[\d,\s]*)", arg):
             return execute_calendar(arg)
 
+    # Same guard as `log`: "add milk to my list" is a request for Nao.
+    if cmd == "add" or cmd.startswith("add "):
+        arg = cmd[len("add"):].strip()
+        if re.fullmatch(r"(all|\*|no|none|skip|[\d,\s]*)", arg):
+            return checkin_log.confirm(
+                arg, lambda t: run_claude(t, model="sonnet"))
+
     if cmd in ("no", "cancel", "nevermind", "never mind"):
         # A bare "no" may be answering either proposal, so clear both rather
         # than guess. Declining everything pending is never the wrong reading
@@ -624,6 +639,8 @@ def builtin(text):
             replies.append("Discarded the %s proposal. Nothing changed." % kind)
         if read_json(CAL_PENDING, {}).get("items"):
             replies.append(execute_calendar("no"))
+        if checkin_log.has_pending():
+            replies.append(checkin_log.confirm("no", None))
         if replies:
             return "\n".join(replies)
         return None   # not answering a proposal — let Claude handle it
@@ -1013,7 +1030,7 @@ def main():
             # Most builtins are instant, but cleanup/do call Claude and can
             # take a minute. A silent gap reads as broken, so ack those too.
             lowered = text.strip().lower()
-            if (lowered.startswith(("cleanup", "triage", "do ", "log "))
+            if (lowered.startswith(("cleanup", "triage", "do ", "log ", "add "))
                     or lowered.startswith("note ")
                     or lowered in ("do", "log", "undo", "note")):
                 send(token, chat_id, "on it…")

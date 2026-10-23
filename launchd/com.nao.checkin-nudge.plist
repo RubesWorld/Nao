@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nao.checkin-nudge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/rubenmacmini/Nao/scripts/checkin-capture.py</string>
+        <string>nudge</string>
+    </array>
+
+    <!-- 21:00 nightly reminder to do the voice check-in. Silent if one
+         already exists for today. It is a reminder, not the trigger:
+         checkin-capture files a check-in whenever it is made. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>21</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/rubenmacmini/Nao</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/rubenmacmini</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/rubenmacmini/Nao/logs/checkin-nudge.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rubenmacmini/Nao/logs/checkin-nudge.err</string>
+</dict>
+</plist>

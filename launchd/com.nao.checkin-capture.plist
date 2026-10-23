@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nao.checkin-capture</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/rubenmacmini/Nao/scripts/checkin-capture.py</string>
+    </array>
+
+    <!-- Every 15 minutes: file any finished #nightly-checkin. Ruben can
+         check in whenever he likes, so this polls rather than firing once
+         after the nudge. A check-in is filed only once it has been
+         unchanged for one full cycle, so expect it 15-30 minutes after the
+         voice chat ends. Each run is one direct HTTP search against
+         tana-local; the model is only invoked when there is something to
+         file. -->
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/rubenmacmini/Nao</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/rubenmacmini</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/rubenmacmini/Nao/logs/checkin-capture.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rubenmacmini/Nao/logs/checkin-capture.err</string>
+</dict>
+</plist>

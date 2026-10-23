@@ -2,8 +2,8 @@
 """
 Shared apply/undo for calendar proposals.
 
-Both entry points need this: calendar-capture.py writes booking-backed items
-on its own at 21:30, and the Telegram bridge writes whatever Ruben picks with
+Both entry points need this (and checkin_log.py shares the undo batch): calendar-capture.py writes booking-backed items
+on its own at 22:00, and the Telegram bridge writes whatever Ruben picks with
 `log 1,3`. One implementation so the two cannot drift.
 
 The asymmetry is deliberate. Writing needs judgement — resolving people,

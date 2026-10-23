@@ -30,6 +30,9 @@ You are Nao (脳, Japanese for "brain"), a persistent AI assistant for Ruben. Ta
 | financial-goal | PZBRvn1frWh4 |
 | card-strategy | 9sgj6--2Eye3 |
 | idea | r4lfIKti2qS3 |
+| nightly-checkin | sbiN1DKnMwvg |
+| activity | ECnN25sK8yg8 |
+| area | 9Ng9O5zV815c |
 | budget-baseline | ylUMgYuEOl9C |
 | financial-account | EbIawUp5CsbQ |
 
@@ -159,9 +162,9 @@ the watcher; `morning-briefing.sh`, pre-run-task.sh prototype;
 `mid-week-budget-check`, its spending pulse duplicated the daily finance
 check-ins, so the Wednesday slot went to `debt-paydown-check`).
 
-## The ambient layer — watcher + bridge + relay + calendar capture
+## The ambient layer — watcher + bridge + relay + calendar capture + check-in
 
-Four components that are NOT prompt jobs. None goes through `run-task.sh`.
+Five components that are NOT prompt jobs. None goes through `run-task.sh`.
 
 **`com.nao.watcher`** — hourly, `scripts/watcher.py`. Silent unless a condition
 trips. This is the difference from every prompt job: it keeps state in
@@ -262,7 +265,7 @@ to know before touching it:
 Ruben's iMessage identity is his **Apple ID email**, not his phone number —
 see the fact node. Relay chats are keyed to the email.
 
-**`com.nao.calendar-capture`** — nightly at 21:30, `scripts/calendar-capture.py`.
+**`com.nao.calendar-capture`** — nightly at 22:00, `scripts/calendar-capture.py`.
 Turns the Google Calendar into Tana's episodic memory. Same split as the
 watcher: `claude -p` classifies (`prompts/calendar-propose.md`, read-only,
 JSON out), Python owns state and numbering. It **proposes and never writes** —
@@ -329,7 +332,7 @@ Writing to the calendar is the `calendar` skill (`skills/calendar/SKILL.md`) —
 one sentence to a real event. It confirms before anything that reaches other
 people (attendees send real invites) or overwrites an existing event.
 
-To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge,bluebubbles,calendar-capture}.plist`
+To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{watcher,telegram-bridge,bluebubbles,calendar-capture,checkin-capture,checkin-nudge}.plist`
 
 **To add a new scheduled task:**
 1. Write `~/Nao/prompts/<name>.md` following the morning-briefing pattern
@@ -337,6 +340,70 @@ To pause the ambient layer: `launchctl unload ~/Library/LaunchAgents/com.nao.{wa
 3. Verify the Tana write happened
 4. Copy `com.nao.morning-briefing.plist`, change Label, schedule, and ProgramArguments
 5. `launchctl load ~/Library/LaunchAgents/com.nao.<name>.plist`
+
+## The nightly check-in — talking through the day
+
+Ruben talks through his day in **Tana mobile**, as a voice memo or a voice
+chat on a `#nightly-checkin` node (tag `sbiN1DKnMwvg`). **It is his update,
+not an interview** (his call, 2026-10-22): the voice chat says "go ahead",
+listens, and asks at most one question at the end, only if a name or due
+date is unclear. A memo is the same thing with no voice on the other end.
+Either way Tana transcribes and fills the fields: Who I saw, What I did, Tasks, Promises, People news, Anything
+else. Nao then files it. The calendar knows an evening was planned; the
+check-in is his own account of what happened, which makes it the strongest
+evidence any part of Nao gets.
+
+- **`com.nao.checkin-nudge`**: 21:00, `checkin-capture.py nudge`. One
+  Telegram reminder, silent if today's check-in already exists. It is a
+  reminder, not the trigger: he can check in any time.
+- **`com.nao.checkin-capture`**: every 15 min, `checkin-capture.py`. Python
+  finds check-ins over direct HTTP and files one only after its content has
+  been **unchanged for a full cycle**, because Tana fills fields when the
+  chat ends and filing half a day would mark it done. Expect results 15-30
+  minutes after the chat. The model (`prompts/checkin-log.md`) does the
+  filing. Python then moves the node to that day's daily note, which also
+  gets it out of the Inbox before `triage` sees it. State is
+  `state/checkin-seen.json`, keyed by node id.
+
+**Write policy, chosen 2026-10-22:** his own account is written without
+asking: interactions (Vibe **only from stated sentiment**, same rule as
+`note`), tasks with Context, fully-fielded promises, Last interaction moved
+forward. An occasion already logged that day (calendar, `/interaction`) is
+added to, never duplicated. Three things are **proposed** on Telegram
+(`add all` / `add 1,3` / `add no`, via `prompts/checkin-confirm.md`) because
+they change long-term memory rather than record a day: a **new contact**,
+durable **news about a person** (appended to Notes), and **facts** about
+Ruben (the memory protocol is propose-first). A confirmed new contact gets
+linked back into the interaction and any promise made to them.
+
+**Where the time goes — activities by area** (added 2026-10-22, Ruben's
+idea). Each thing he spent time on ("What I did") becomes one `#activity`
+(What, Area, Date, optional Project, Hours only if he said a duration) linked
+to an `#area`: Content creation (videos, TikTok), AI building (bots, Nao,
+coding projects), Fitness (gym), Career (work), and the other existing areas.
+Hangouts are interactions and count toward Relationship, so they are never
+counted twice. Chores are skipped. A recurring pursuit with no area is filed
+with Area empty and a `new-area` proposal; Nao never creates an area itself.
+The Sunday weekly review rolls it up as **distinct days per area** (not
+hours, which a quick voice memo can't give honestly) and flags any area
+quiet for 7+ days that was active in the last 60. That flag is report-only,
+in the weekly review, and never an alert: notification fatigue again.
+
+**Undo shares the calendar's batch.** `undo` reverses the most recent write,
+whichever job made it. It trashes nodes the check-in created and restores
+Last interaction; text appended to an existing node is left in place.
+Confirmed `add`s have no undo, since he approved each one.
+
+**The tag's fields are plain text on purpose.** Instance fields
+(`Instance of #Task`, `#Person`) would let Tana create bare tasks with no
+Context and duplicate people before Nao ever sees them. Tana transcribes,
+Nao files. The voice greeting, voice instructions and per-field AI instructions
+live on the tag and are editable with the Tana Cloud MCP's
+`set_tag_metadata` / `set_field_metadata`. **Don't use angle-bracket
+placeholders in them:** Tana strips them as HTML.
+
+Calendar sync moved from 21:30 to **22:00** so the check-in usually lands
+first. The calendar proposer skips occasions already logged on that date.
 
 ## Filling in what the calendar could not know — `note`
 
@@ -496,7 +563,8 @@ Consequences worth internalising:
   restarts, at which point it silently picks up whatever is on disk. If it
   restarts while a feature branch is checked out, that branch is now live.
 - **The watcher and calendar-capture re-read on every run**, because launchd
-  re-execs them. Whatever is on disk at :50 or 21:30 is what runs.
+  re-execs them. Whatever is on disk at :50, 22:00 or the next 15-minute
+  check-in poll is what runs.
 - **So: end on `main`.** Do the work on a branch, merge it, `git pull`, and
   leave the tree on `main` before walking away. Never leave a feature branch
   checked out overnight.
@@ -517,8 +585,8 @@ Consequences worth internalising:
 
 | Changed | Action |
 |---|---|
-| `telegram-bridge.py`, `nao_telegram.py`, `calendar_log.py`, `nao_audit.py` | `launchctl unload && load com.nao.telegram-bridge.plist`, then check the startup line in `logs/telegram-bridge.log` |
-| `watcher.py`, `tana_client.py`, `calendar-capture.py` | nothing — next scheduled run picks it up. Force one to verify rather than waiting. |
+| `telegram-bridge.py`, `nao_telegram.py`, `calendar_log.py`, `checkin_log.py`, `nao_audit.py` | `launchctl unload && load com.nao.telegram-bridge.plist`, then check the startup line in `logs/telegram-bridge.log` |
+| `watcher.py`, `tana_client.py`, `calendar-capture.py`, `checkin-capture.py` | nothing — next scheduled run picks it up. Force one to verify rather than waiting. |
 | Any `prompts/*.md` | nothing; read fresh each run |
 | A `.plist` | `launchctl unload && load`, and copy it into `launchd/` so it is tracked |
 

@@ -11,17 +11,20 @@
         <string>/Users/rubenmacmini/Nao/scripts/calendar-capture.py</string>
     </array>
 
-    <!-- 21:30 nightly. Late enough that the evening's plans have actually
+    <!-- 22:00 nightly. Late enough that the evening's plans have actually
          happened (the proposer only offers events that have already ended),
-         early enough that Ruben is still awake to answer. Silent on any night
-         with nothing new — state/calendar-seen.json is what stops it
-         re-proposing the same hangout. -->
+         early enough that Ruben is still awake to answer. Moved from 21:30
+         on 2026-10-22 so it runs after the 21:00 check-in has been filed:
+         the proposer skips any occasion already logged on that date, so
+         the check-in's richer record wins and nothing is logged twice.
+         Silent on any night with nothing new — state/calendar-seen.json is
+         what stops it re-proposing the same hangout. -->
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
-        <integer>21</integer>
+        <integer>22</integer>
         <key>Minute</key>
-        <integer>30</integer>
+        <integer>0</integer>
     </dict>
 
     <key>RunAtLoad</key>
