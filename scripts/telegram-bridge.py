@@ -80,6 +80,7 @@ TRANSCRIPT_REPLY_CHARS = 1500   # stored reply excerpt; full reply still sent
 # Ruben's call so the deployed allowlist never feels tight.
 DEFAULT_ALLOWED_TOOLS = [
     "mcp__tana-local",      # all Tana tools — read AND write, Nao's memory
+    "mcp__tana-outliner-local",  # same server, renamed 2026-10-21
     "mcp__monarch-money",   # finance questions
     "Read",
     "Bash(date:*)",         # prompts need today's date

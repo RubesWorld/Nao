@@ -45,7 +45,15 @@ def _auth_header():
             servers = json.load(f).get("mcpServers", {})
     except (IOError, ValueError):
         return None
-    return servers.get("tana-local", {}).get("headers", {}).get("Authorization")
+    # Matched by URL, not by name: the server was renamed tana-local →
+    # tana-outliner-local on 2026-10-21 and every deterministic path went
+    # quietly 401 → LLM fallback for a day before anyone noticed.
+    for server in servers.values():
+        if server.get("url", "").rstrip("/") == DEFAULT_URL:
+            auth = server.get("headers", {}).get("Authorization")
+            if auth:
+                return auth
+    return None
 
 
 class TanaClient:
