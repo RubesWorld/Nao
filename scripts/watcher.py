@@ -159,6 +159,13 @@ def _first_date(value):
     if m:
         return m.group(0)
 
+    # Recent dates render relative to now. Missing these meant a promise due
+    # "Today" or "Tomorrow" parsed to None and never alerted on its own day.
+    m = re.search(r"\b(Today|Yesterday|Tomorrow)\b", text, re.IGNORECASE)
+    if m:
+        offset = {"today": 0, "yesterday": -1, "tomorrow": 1}[m.group(1).lower()]
+        return (date.today() + timedelta(days=offset)).isoformat()
+
     m = re.search(r"(?:(Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,\s*)?"
                   r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*"
                   r"\s+(\d{1,2})(?:,\s*(\d{4}))?", text)
