@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """
-Nao texts capture — a real text conversation counts as contact.
+Nao texts capture — real text conversations, as communication.
 
 Daily at 08:15, for the day before (04:00 → 04:00, like the check-in). Reads
 one-on-one chats from Beeper, keeps only real conversations, and moves the
-linked Person's Last interaction forward. Chats not yet linked to anyone are
-proposed on Telegram (`link 1,3` / `link all` / `link no`). Policy and the
-conversation test live in texts_log.py.
+linked Person's **Last texted** forward (never Last interaction, which is for
+seeing people). A chat not linked to anyone is proposed once on Telegram
+(`link 1,3` / `link all` / `link no` / `link 2 Full Name`).
 
-Deterministic Python end to end: no model reads or classifies messages.
+On Sundays it also sends the week: who he texted, on how many days, and
+everyone he really texted who still isn't in Tana, as a fresh `link` list.
+
+Policy and the conversation test live in texts_log.py. Deterministic Python
+end to end: no model reads or classifies messages.
 
 Catches up on missed days (mini asleep) up to CATCH_UP_DAYS back.
 Exit codes: 0 = ran fine, 1 = Beeper or Tana unreachable.
@@ -30,7 +34,7 @@ from nao_telegram import send  # noqa: E402
 
 STATE_PATH = os.path.join(NAO, "state", "texts-capture.json")
 LOG_PATH = os.path.join(NAO, "logs", "tasks.log")
-CATCH_UP_DAYS = 3
+CATCH_UP_DAYS = int(os.environ.get("NAO_TEXTS_CATCH_UP", "3"))  # 7 to seed a week
 WARN_EXPIRY_DAYS = 3
 
 
@@ -83,8 +87,9 @@ def run():
 
     target = yesterday()
     last = state.get("lastDay")
-    first = max(date.fromisoformat(last) + timedelta(days=1) if last else target,
-                target - timedelta(days=CATCH_UP_DAYS - 1))
+    earliest = target - timedelta(days=CATCH_UP_DAYS - 1)
+    first = max(date.fromisoformat(last) + timedelta(days=1), earliest) \
+        if last else earliest
     days = [first + timedelta(days=i) for i in range((target - first).days + 1)]
     if not days:
         log("quiet (already did %s)" % last)
@@ -114,67 +119,109 @@ def run():
 
     links = texts_log.read_json(texts_log.PEOPLE_PATH, {})
     pending = texts_log.read_json(texts_log.PENDING_PATH, {}).get("items") or []
-    asked = {p["chatID"] for p in pending}
     by_id = {p["id"]: p for p in people}
+    by_title = {v["title"]: v for v in links.values() if v.get("personId")}
     moved, proposals, convo_count = [], [], 0
 
     for day, convos in found:
         day_iso = day.isoformat()
+        history = []
         for chat, stats in convos:
             convo_count += 1
             network = texts_log.NETWORKS.get(chat.get("accountID", "").split(".")[0],
                                              chat.get("network") or "texts")
-            link = links.get(chat["id"])
-            if link is None:
+            link = links.get(chat["id"]) or {}
+            if not link.get("personId") and chat["title"] in by_title:
+                # Same contact on another network ("RayRay" on SMS and WhatsApp).
+                link = dict(by_title[chat["title"]])
+                links[chat["id"]] = link
+            if not link.get("personId"):
                 exact, likely = texts_log.candidate(chat["title"], people)
                 if exact:
                     link = {"personId": exact["id"], "name": exact["name"],
                             "title": chat["title"]}
                     links[chat["id"]] = link
-                elif chat["id"] not in asked:
-                    asked.add(chat["id"])
+                elif not link.get("asked"):
+                    # Asked once, daily. After that only Sunday brings it back.
+                    links[chat["id"]] = {"asked": day_iso, "title": chat["title"]}
                     proposals.append({
                         "chatID": chat["id"], "title": chat["title"],
                         "network": network, "date": day_iso,
                         "personId": likely and likely["id"],
                         "personName": likely and likely["name"]})
-                    continue
-            if not link or link.get("ignore") or not link.get("personId"):
-                continue
-            person = by_id.get(link["personId"])
+            history.append({"chatID": chat["id"], "title": chat["title"],
+                            "network": network})
+            person = by_id.get(link.get("personId"))
             if not person:
-                continue           # Person trashed since it was linked
+                continue
             why = "real text conversation on %s (%d/%d msgs, %d turns)" % (
                 network, stats["mine"], stats["theirs"], stats["turns"])
             try:
-                if texts_log.move_last_interaction(tana, person, day_iso, why,
-                                                   "texts-capture"):
+                if texts_log.move_last_texted(tana, person, day_iso, why,
+                                              "texts-capture"):
                     moved.append(person["name"])
             except Exception as e:
                 log("skipped %s (%s)" % (person["name"], e))
+        texts_log.record_history(day_iso, history)
 
     texts_log.write_json(texts_log.PEOPLE_PATH, links)
     state["lastDay"] = target.isoformat()
     warn_expiry(beeper, state)
     texts_log.write_json(STATE_PATH, state)
 
+    sunday = datetime.now().weekday() == 6
     new = []
-    if proposals and not pending:
+    if sunday:
+        new = weekly(target, links, by_id)
+    elif proposals and not pending:
         # One live list at a time, so `link 2` always means what he saw.
-        # Anything found while a list is unanswered is asked about next time.
+        # Anything found while a list is unanswered waits for Sunday.
         new = texts_log.save_pending(proposals)
-    if new:
         lines = ["💬 Real text conversations with people I can't place yet:"]
         lines += ["%d. %s" % (i, texts_log.describe(p)) for i, p in enumerate(new, 1)]
-        lines += ["", "`link all` / `link 1,3` / `link no` — anything you don't "
-                      "pick won't be asked about again."]
-        send("\n".join(lines), [[("Link all", "tx:all"), ("Skip", "tx:no")]])
+        lines += ["", "`link all` / `link 1,3` / `link no` / `link 2 Full Name`"]
+        send("\n".join(lines), [[("Link all", "tx:all"), ("Not now", "tx:no")]])
 
-    log("%s: %d conversation(s), %d Last interaction moved%s%s" % (
+    log("%s: %d conversation(s), %d Last texted moved%s%s%s" % (
         ",".join(d.isoformat() for d in days), convo_count, len(moved),
         " (%s)" % ", ".join(moved) if moved else "",
-        ", %d proposed" % len(new) if new else ""))
+        ", %d proposed" % len(new) if new else "",
+        ", weekly sent" if sunday else ""))
     return 0
+
+
+def weekly(end_day, links, by_id):
+    """Sunday: who he texted this week, and who still isn't in Tana.
+
+    The unknowns become the live `link` list, replacing any stale one, so the
+    numbers match this message. Always sends: a week of texting with nobody
+    is itself worth seeing, and it doubles as proof the job is alive.
+    """
+    texted, unknown = texts_log.week_summary(end_day, links)
+    lines = ["💬 Texting this week"]
+    if texted:
+        lines += ["%s — %d day%s" % (n, d, "" if d == 1 else "s")
+                  for n, d in texted[:12]]
+    else:
+        lines.append("No real conversations with anyone in Tana.")
+    items = []
+    if unknown:
+        people = list(by_id.values())
+        for u in unknown:
+            _, likely = texts_log.candidate(u["title"], people)
+            items.append(dict(u, personId=likely and likely["id"],
+                              personName=likely and likely["name"]))
+        items = texts_log.save_pending(items)
+        lines += ["", "Texted this week, not linked to anyone in Tana yet:"]
+        lines += ["%d. %s" % (i, texts_log.describe(p)) for i, p in enumerate(items, 1)]
+        if len(unknown) > len(items):
+            lines.append("…and %d more." % (len(unknown) - len(items)))
+        lines += ["", "`link all` / `link 1,3` / `link 2 Full Name` / `link no`"]
+        send("\n".join(lines), [[("Link all", "tx:all"), ("Not now", "tx:no")]])
+    else:
+        texts_log.write_json(texts_log.PENDING_PATH, {"items": []})
+        send("\n".join(lines))
+    return items
 
 
 if __name__ == "__main__":

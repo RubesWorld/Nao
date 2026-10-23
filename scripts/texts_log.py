@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Texts as contact — a real text conversation moves a Person's Last interaction.
+Texts as communication — a real text conversation sets a Person's Last texted.
 
 Beeper (beeper_client.py) bridges Google Messages, WhatsApp and Telegram. Once
 a day, texts-capture.py looks at yesterday's one-on-one chats and decides which
@@ -14,25 +14,29 @@ Calibrated on 2026-10-22's real traffic: it kept seven back-and-forths
 (Chloe, Wyatt, Ashleigh, ...) and dropped one-way texts, short codes, bots and
 a two-message "running late".
 
-Who a chat belongs to is the risky part, so it is never guessed:
-- a chat title that equals a Person's name exactly (normalised) is linked
-  automatically;
-- anything else is **proposed once** on Telegram (`link 1,3` / `link all` /
-  `link no`): link to a likely Person ("Chris Wilson" → Christopher Wilson), or
-  add as a new contact. Whatever he doesn't pick is remembered as ignored and
-  never asked about again. Notification fatigue arrives by accumulation.
+**Texts go to Last texted, never Last interaction** (Ruben's call,
+2026-10-23: hangouts matter more). Last interaction drives the cadence nudges
+and the Sunday review, and it stays about seeing people, so someone he texts
+daily but hasn't seen in a month is still flagged. No #interaction node per
+thread either: it would bury the hangouts and trip the digest's thin-node
+nudge. Every move is in logs/actions.jsonl with both dates.
 
-What gets written: Last interaction, moved forward only. No #interaction
-node — a node per text thread would bury the real hangouts, and an empty one
-is exactly what the end-of-day digest flags as thin. Every move is in
-logs/actions.jsonl with both dates, which is the record.
+Who a chat belongs to is never guessed:
+- a chat title equal to one Person's name (normalised) links automatically;
+- anything else is proposed on Telegram (`link 1,3` / `link all` /
+  `link no` / `link 2 Rachel Desai`): to a likely Person ("Chris Wilson" →
+  Christopher Wilson), or as a new contact. Each chat is asked about **once**
+  in the daily message. Unlinked ones are not forgotten: Sunday's message
+  lists everyone he really texted that week who still isn't in Tana. That list
+  is bounded by the week's actual conversations, so it can't grow forever.
 
 Group chats are skipped for now: who in a group was actually talking to Ruben
 is a harder question than it looks.
 
 State:
-  state/texts-people.json   chat id → {personId, name} or {ignore: true}
+  state/texts-people.json   chat id → {personId, name} or {asked: date}
   state/texts-pending.json  the live proposal list (one at a time)
+  state/texts-history.json  day → conversations (60 days), for Sunday
   state/texts-capture.json  last day processed, token-expiry warning
 """
 
@@ -51,9 +55,11 @@ import nao_audit  # noqa: E402
 STATE = os.path.join(NAO, "state")
 PEOPLE_PATH = os.path.join(STATE, "texts-people.json")
 PENDING_PATH = os.path.join(STATE, "texts-pending.json")
+HISTORY_PATH = os.path.join(STATE, "texts-history.json")
+HISTORY_DAYS = 60
 
 PERSON_TAG = "cQ7tTJTcfs72"
-LAST_INTERACTION = "q5wo_UUohjlq"
+LAST_TEXTED = "XdAMQmaGuMVQ"
 CONTEXT_FIELD = "G0JyrqEiSl3q"
 HOME = "xAJR7-Msy1YZ"
 WORKSPACE = "drg2JUfK3f-A"
@@ -194,40 +200,41 @@ def load_people(tana):
             and len(n.get("name", "")) < 60]     # skips the FDA speaker-list note
 
 
-def last_interaction(tana, person_id):
+def last_texted(tana, person_id):
     """(raw, YYYY-MM-DD or None). Tana renders dates for people ("Yesterday",
     "Mon, Jun 1"), so the raw value is kept to tell unset from unparseable."""
     from watcher import _extract_fields, _first_date
     fields = _extract_fields(tana.read_node(person_id), {
-        "li": ("Last interaction", LAST_INTERACTION)})
-    return fields["li"], _first_date(fields["li"])
+        "d": ("Last texted", LAST_TEXTED)})
+    return fields["d"], _first_date(fields["d"])
 
 
-def move_last_interaction(tana, person, day_iso, why, actor):
-    """Set Last interaction to day_iso if that is later. Returns True if moved.
+def move_last_texted(tana, person, day_iso, why, actor):
+    """Set Last texted to day_iso if that is later. Returns True if moved.
 
     An existing date that can't be parsed is left alone: overwriting it could
     move the field backwards, which is the one direction it must never go.
     """
-    raw, prior = last_interaction(tana, person["id"])
+    raw, prior = last_texted(tana, person["id"])
     if raw and not prior:
-        raise RuntimeError("can't read Last interaction %r on %s"
+        raise RuntimeError("can't read Last texted %r on %s"
                            % (raw, person["name"]))
     if prior and prior >= day_iso:
         return False
     tana.call_tool("set_field_content", {
-        "nodeId": person["id"], "attributeId": LAST_INTERACTION,
+        "nodeId": person["id"], "attributeId": LAST_TEXTED,
         "content": day_iso})
-    nao_audit.record(actor, "wrote", why=why, kind="last-interaction",
+    nao_audit.record(actor, "wrote", why=why, kind="last-texted",
                      title=person["name"], nodeId=person["id"], auto=True,
-                     changed={person["id"]: {"lastInteraction": [prior, day_iso]}})
+                     changed={person["id"]: {"lastTexted": [prior, day_iso]}})
     return True
 
 
-def create_person(tana, name, network, day_iso):
-    paste = ("- %s #[[^%s]]\n  - [[^%s]]:: Texts with Ruben on %s.\n"
-             "  - [[^%s]]:: %s\n" % (name, PERSON_TAG, CONTEXT_FIELD, network,
-                                     LAST_INTERACTION, day_iso))
+def create_person(tana, name, context, day_iso):
+    """New Person with Context and Last texted only. Last interaction stays
+    empty: texting someone is not having seen them."""
+    paste = ("- %s #[[^%s]]\n  - [[^%s]]:: %s\n  - [[^%s]]:: %s\n"
+             % (name, PERSON_TAG, CONTEXT_FIELD, context, LAST_TEXTED, day_iso))
     out = tana.call_tool("import_tana_paste",
                          {"parentNodeId": HOME, "content": paste})
     # Reply lists "Created nodes:\n- <id> ("<name>")"; the first is the Person.
@@ -235,95 +242,170 @@ def create_person(tana, name, network, day_iso):
     return m.group(1) if m else None
 
 
+# ---- history (for Sunday) -------------------------------------------------------
+
+def record_history(day_iso, entries):
+    """entries: [{chatID, title, network, personId|None, name|None}]."""
+    hist = read_json(HISTORY_PATH, {})
+    hist[day_iso] = entries
+    cutoff = (date.fromisoformat(day_iso) - timedelta(days=HISTORY_DAYS)).isoformat()
+    write_json(HISTORY_PATH, {d: v for d, v in hist.items() if d >= cutoff})
+
+
+def week_summary(end_day, links):
+    """(texted, unknown) for the 7 days ending end_day.
+
+    texted:  [(name, days)] for linked people, most days first
+    unknown: [{chatID, title, network, date, days, personId?, personName?}]
+             for chats still not linked to anyone
+    """
+    hist = read_json(HISTORY_PATH, {})
+    start = (end_day - timedelta(days=6)).isoformat()
+    texted, unknown = {}, {}
+    for d, entries in sorted(hist.items()):
+        if not start <= d <= end_day.isoformat():
+            continue
+        for e in entries:
+            link = links.get(e["chatID"]) or {}
+            if link.get("personId"):
+                texted.setdefault(link["name"], set()).add(d)
+            else:
+                u = unknown.setdefault(e["chatID"], dict(e, days=set()))
+                u["days"].add(d)
+                u["date"] = d
+    texted = sorted(((n, len(ds)) for n, ds in texted.items()),
+                    key=lambda x: (-x[1], x[0]))
+    unknown = sorted(unknown.values(), key=lambda u: (-len(u["days"]), u["title"]))
+    for u in unknown:
+        u["days"] = len(u["days"])
+    return texted, unknown
+
+
 # ---- proposals ------------------------------------------------------------------
 
 def describe(p):
     where = p.get("network", "texts")
+    seen = " — %d days this week" % p["days"] if p.get("days", 0) > 1 else ""
     if p.get("personId"):
-        return "%s (%s) → %s?" % (p["title"], where, p["personName"])
-    return "%s (%s) → add as a new contact?" % (p["title"], where)
+        return "%s (%s) → %s?%s" % (p["title"], where, p["personName"], seen)
+    return "%s (%s) → add as a new contact?%s" % (p["title"], where, seen)
 
 
 def save_pending(items):
-    write_json(PENDING_PATH, {"items": items[:MAX_PROPOSALS],
+    items = items[:MAX_PROPOSALS]
+    write_json(PENDING_PATH, {"items": items,
                               "at": datetime.now(timezone.utc).isoformat()})
-    for p in items[:MAX_PROPOSALS]:
+    for p in items:
         nao_audit.record("texts-capture", "asked",
                          why="who a chat belongs to is never guessed",
                          kind="text-link", title=describe(p))
-    return items[:MAX_PROPOSALS]
+    return items
 
 
 def has_pending():
     return bool(read_json(PENDING_PATH, {}).get("items"))
 
 
+SELECTION_RE = r"(all|\*|no|none|skip|[\d,\s]*|\d+\s+[^\d,].*)"
+
+
+def _parse(sel, n):
+    """(indexes, rename) or an error string. `2 Rachel Desai` names item 2."""
+    m = re.fullmatch(r"(\d+)\s+([^\d,].*)", sel)
+    if m:
+        idx = int(m.group(1)) - 1
+        if not 0 <= idx < n:
+            return "No item %s — the list has %d." % (m.group(1), n)
+        return [idx], m.group(2).strip()
+    if sel in ("no", "none", "skip"):
+        return [], None
+    if sel in ("all", "*", ""):
+        return list(range(n)), None
+    chosen = []
+    for part in re.split(r"[,\s]+", sel):
+        if not part:
+            continue
+        if not part.isdigit():
+            return "Couldn't read %r. Try `link 1,3`, `link all`, `link no`, or `link 2 Full Name`." % part
+        idx = int(part) - 1
+        if not 0 <= idx < n:
+            return "No item %s — the list has %d." % (part, n)
+        chosen.append(idx)
+    return chosen, None
+
+
 def confirm(selection, tana=None):
-    """`link all` / `link 1,3` / `link no` from the bridge. No model involved:
-    linking is bookkeeping, and the one write is a date."""
-    sel = (selection or "").strip().lower()
+    """`link all` / `link 1,3` / `link no` / `link 2 Rachel Desai` from the
+    bridge. No model involved: linking is bookkeeping, and the write is a date.
+
+    Unpicked items are "not now", not "never": they come back only in the
+    Sunday list, and only if he really texted them that week.
+    """
+    raw = (selection or "").strip()
     pending = read_json(PENDING_PATH, {}).get("items") or []
     if not pending:
         return "No text contacts waiting."
-    if sel in ("no", "none", "skip"):
-        chosen = []
-    elif sel in ("all", "*", ""):
-        chosen = list(range(len(pending)))
-    else:
-        chosen = []
-        for part in re.split(r"[,\s]+", sel):
-            if not part:
-                continue
-            if not part.isdigit():
-                return "Couldn't read %r. Try `link 1,3`, `link all`, or `link no`." % part
-            idx = int(part) - 1
-            if not 0 <= idx < len(pending):
-                return "No item %s — the list has %d." % (part, len(pending))
-            chosen.append(idx)
+    parsed = _parse(raw.lower(), len(pending))
+    if isinstance(parsed, str):
+        return parsed
+    chosen, rename = parsed
+    if rename:
+        rename = raw[len(raw) - len(rename):].strip()    # keep his capitalisation
 
     if chosen and tana is None:
         from tana_client import TanaClient
         tana = TanaClient()
+    people = load_people(tana) if rename else []
 
-    people = read_json(PEOPLE_PATH, {})
+    links = read_json(PEOPLE_PATH, {})
     lines, failed = [], []
     for i, p in enumerate(pending):
         key = p["chatID"]
         if i not in chosen:
-            people[key] = {"ignore": True, "title": p["title"]}
-            nao_audit.record("bridge", "skipped", why="not picked; won't ask again",
-                             kind="text-link", title=describe(p))
+            if rename:
+                failed.append(p)          # naming one item leaves the rest open
             continue
         try:
-            if p.get("personId"):
-                person = {"id": p["personId"], "name": p["personName"]}
-                moved = move_last_interaction(
-                    tana, person, p["date"], "texted %s (confirmed link)" % p["title"],
-                    "bridge")
-                lines.append("✅ %s is %s%s" % (p["title"], person["name"],
-                             " — Last interaction → %s" % p["date"] if moved else ""))
+            target = None
+            if rename:
+                exact, _ = candidate(rename, people)
+                target = exact
+            elif p.get("personId"):
+                target = {"id": p["personId"], "name": p["personName"]}
+            if target:
+                moved = move_last_texted(
+                    tana, target, p["date"],
+                    "texted %s (link confirmed)" % p["title"], "bridge")
+                lines.append("✅ %s is %s%s" % (p["title"], target["name"],
+                             " — Last texted %s" % p["date"] if moved else ""))
             else:
-                pid = create_person(tana, p["title"], p.get("network", "texts"), p["date"])
+                name = rename or p["title"]
+                context = "Texts with Ruben on %s%s." % (
+                    p.get("network", "texts"),
+                    " (saved as %s)" % p["title"] if name != p["title"] else "")
+                pid = create_person(tana, name, context, p["date"])
                 if not pid:
                     # Possibly created with an unreadable reply; retrying could
                     # duplicate them, so this one is not offered again.
-                    lines.append("⚠️ Couldn't confirm %s was created — check Tana" % p["title"])
+                    lines.append("⚠️ Couldn't confirm %s was created — check Tana" % name)
                     continue
-                person = {"id": pid, "name": p["title"]}
+                target = {"id": pid, "name": name}
                 nao_audit.record("bridge", "wrote", why="new contact from texts, confirmed",
-                                 kind="new-person", title=p["title"], nodeId=pid)
-                lines.append("✅ Added %s (Last interaction %s)" % (p["title"], p["date"]))
-            people[key] = {"personId": person["id"], "name": person["name"],
-                           "title": p["title"]}
+                                 kind="new-person", title=name, nodeId=pid)
+                lines.append("✅ Added %s%s" % (
+                    name, " (texts as %s)" % p["title"] if name != p["title"] else ""))
+            links[key] = {"personId": target["id"], "name": target["name"],
+                          "title": p["title"]}
         except Exception as e:
             failed.append(p)
-            lines.append("⚠️ %s failed (%s) — `link %d` to retry"
-                         % (p["title"], str(e)[:80], len(failed)))
-    write_json(PEOPLE_PATH, people)
-    # Only failures stay pending, renumbered in the reply above.
+            lines.append("⚠️ %s failed (%s)" % (p["title"], str(e)[:80]))
+    write_json(PEOPLE_PATH, links)
     write_json(PENDING_PATH, {"items": failed,
                               "at": datetime.now(timezone.utc).isoformat()})
-    skipped = len(pending) - len(chosen)
-    if skipped:
-        lines.append("Won't ask about %d other%s again." % (skipped, "" if skipped == 1 else "s"))
-    return "\n".join(lines)
+    if failed:
+        lines.append("Still open:")
+        lines += ["%d. %s" % (n, describe(p)) for n, p in enumerate(failed, 1)]
+    elif len(chosen) < len(pending):
+        lines.append("The rest stay unlinked; you'll see them Sunday if you "
+                     "keep texting.")
+    return "\n".join(lines) or "Nothing linked."

@@ -574,9 +574,9 @@ def builtin(text):
                 "                — log the calendar hangouts/trips proposed\n"
                 "  add 1,3 / add all / add no\n"
                 "                — add the contacts/facts a check-in proposed\n"
-                "  link 1,3 / link all / link no\n"
+                "  link 1,3 / link all / link no / link 2 Full Name\n"
                 "                — match texted contacts to people (unpicked\n"
-                "                  ones are never asked about again)\n"
+                "                  ones come back in Sunday's list)\n"
                 "  undo / undo 1 — reverse the last calendar or check-in write\n"
                 "  actions [n]   — what Nao wrote lately, and why\n"
                 "  note …        — add detail to a logged hangout\n"
@@ -635,9 +635,12 @@ def builtin(text):
                 arg, lambda t: run_claude(t, model="sonnet"))
 
     # Same guard again: "link me the article" is a request for Nao.
+    # `link 2 Rachel Desai` names a contact, so it needs the original case,
+    # and is only claimed while a list is waiting ("link 5 articles on X").
     if cmd == "link" or cmd.startswith("link "):
-        arg = cmd[len("link"):].strip()
-        if re.fullmatch(r"(all|\*|no|none|skip|[\d,\s]*)", arg):
+        arg = text.strip()[len("link"):].strip()
+        if re.fullmatch(r"(all|\*|no|none|skip|[\d,\s]*)", arg.lower()) or (
+                re.fullmatch(r"\d+\s+[^\d,].*", arg) and texts_log.has_pending()):
             return texts_log.confirm(arg)
 
     if cmd in ("no", "cancel", "nevermind", "never mind"):
