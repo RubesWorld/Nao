@@ -23,7 +23,7 @@ Cadence-to-days mapping (for reach-out window math):
 
 # Step 3: Gather all people
 
-`search_nodes` with `hasType: "cQ7tTJTcfs72"`. For each Person:
+`search_nodes` with `hasType: "cQ7tTJTcfs72"`. **Skip anyone whose Relationship is Business Venture Outreach** (option `sQIpvel93I44`): they are prospect contacts for a project (Kelmara Health), not relationships Ruben keeps, and they belong in that project's work, not this review. For each remaining Person:
 - Read the node to get Last interaction (`q5wo_UUohjlq`), Cadence (`wVnOpgqJYQJT`), Relationship (`fxpCQuDuXPd7`), **Birthday (`LneKNR9MAoEt`)**, Important dates (`3AemJsZ4ADDe`), Next reach out (`7F-NpOa3hg5j`), Context, Notes, Interests
   - Read **both** date fields. The Person tag has a dedicated Birthday field *and* a multi-value Important dates field, and people get entered in either — Birthday is what Tana's own UI offers first, so it is the one most likely to be filled by hand. Checking only Important dates meant a birthday typed into the obvious field never surfaced.
 - For each, search related interaction nodes (tag `1y3M8tt6ahGs`) by Person field — note the most recent and its Vibe
