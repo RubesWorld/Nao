@@ -5,21 +5,30 @@
     <key>Label</key>
     <string>com.nao.devfeed-server</string>
 
-    <!-- Serves ~/Nao/external/devfeed/public (index.html + feed.json) on the tailnet only.
-         Bound to the Tailscale IP, so nothing on the LAN or internet can
-         reach it. If Tailscale is down at boot the bind fails and launchd
-         retries (ThrottleInterval) until it comes up. -->
+    <!-- devfeed.py serve: the page (~/Nao/external/devfeed/public) plus
+         POST /api/advance for swipe-to-move, limited to config board.advance.
+         --no-collect: com.nao.devfeed runs collect. Bound to the Tailscale IP
+         (config "bind"), so nothing on the LAN or internet can reach it. If
+         Tailscale is down at boot the bind fails and launchd retries
+         (ThrottleInterval) until it comes up. devfeed-run.sh restarts this
+         when it checks out a new pinned version. -->
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>-m</string>
-        <string>http.server</string>
-        <string>8300</string>
-        <string>--bind</string>
-        <string>100.118.35.80</string>
-        <string>--directory</string>
-        <string>/Users/rubenmacmini/Nao/external/devfeed/public</string>
+        <string>/Users/rubenmacmini/Nao/external/devfeed/devfeed.py</string>
+        <string>serve</string>
+        <string>--no-collect</string>
+        <string>--config</string>
+        <string>/Users/rubenmacmini/Nao/config/devfeed.json</string>
     </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/rubenmacmini</string>
+    </dict>
 
     <key>KeepAlive</key>
     <true/>

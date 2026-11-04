@@ -26,6 +26,8 @@ if [[ "$(git -C "$SRC" describe --tags --exact-match 2>/dev/null)" != "$VERSION"
     && git -C "$SRC" -c advice.detachedHead=false checkout --quiet "$VERSION" \
     || { echo "[$(ts)] devfeed: ERROR can't check out $VERSION" >> "$LOG"; exit 1; }
   echo "[$(ts)] devfeed: now on $VERSION" >> "$LOG"
+  # The page server runs the checked-out code too: restart it onto the new version.
+  launchctl kickstart -k "gui/$(id -u)/com.nao.devfeed-server" 2>/dev/null || true
 fi
 
 # devfeed logs "[ts] devfeed: ..." lines itself, which health-check.py reads.
