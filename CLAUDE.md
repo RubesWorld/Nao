@@ -541,7 +541,9 @@ log and a rate limit in front of it.
 A near-real-time view of what Ruben is shipping, and what is waiting on him,
 across his repos — the place to catch up on context, especially once the AI
 factory opens PRs on its own. At
-**http://100.118.35.80:8300** (tailnet only — the port is bound to the
+**http://mini:8300** (MagicDNS name of the Mac mini; also
+http://100.118.35.80:8300. Names you open it by must be in `hosts` in
+`config/devfeed.json` or swipe moves are refused) (tailnet only — the port is bound to the
 Tailscale IP, so nothing on the LAN or internet can reach it).
 
 - **The code lives upstream, in the open-source
