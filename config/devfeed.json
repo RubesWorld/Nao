@@ -10,7 +10,11 @@
   "board": {
     "owner": "RubesWorld", "number": 1,
     "count_only_columns": ["Backlog"],
-    "next_up": { "columns": ["Spec'd", "Ready"], "hold_labels": ["risk:", "spec:needs-answers"] }
+    "next_up": { "columns": ["Spec'd", "Ready"], "hold_labels": ["risk:", "spec:needs-answers"] },
+    "advance": {
+      "Spec'd": "Ready",
+      "Backlog": { "to": "Inbox", "add_labels": ["inbox"], "remove_labels": ["backlog"] }
+    }
   },
   "repos": [
     { "repo": "RubesWorld/Nao", "display": "Nao", "slot": 1, "pin": true },

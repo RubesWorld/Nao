@@ -566,9 +566,18 @@ Tailscale IP, so nothing on the LAN or internet can reach it).
 - **The page leads with catch-up:** "since you last looked" counts (per
   device, localStorage), open PRs and branches, then the board, with age
   flags for stale PRs, quiet branches and stuck cards.
-- **`com.nao.devfeed-server`** — KeepAlive daemon, plain
-  `python3 -m http.server` serving `~/Nao/external/devfeed/public/`. If
-  Tailscale is down at boot the bind fails and launchd retries every 60s.
+- **`com.nao.devfeed-server`** — KeepAlive daemon, `devfeed.py serve
+  --no-collect` serving `~/Nao/external/devfeed/public/` plus
+  `POST /api/advance`. If Tailscale is down at boot the bind fails and
+  launchd retries every 60s. `devfeed-run.sh` restarts it after checking out
+  a new pinned version.
+- **Swipes (v0.4.0+):** left on a row = seen (per device, until it changes);
+  right on a board card = move it, only along `board.advance` in
+  `config/devfeed.json`: **Spec'd → Ready** (the approval that lets the build
+  runner pick it up) and **Backlog → Inbox** (label swap `backlog` → `inbox`,
+  i.e. a promote). 5-second Undo before anything is written; held cards
+  (`needs-human`, `risk:`, `spec:needs-answers`) never move. Writes use the
+  keyring `gh` login (needs the `project` scope, which it has).
 - **`com.nao.devfeed-digest`** — daily at 07:30, `scripts/devfeed-digest.sh`
   → `devfeed.py digest`: refreshes the feed and emails `digest.to` (HTML in
   the page's dark look, plain text as fallback) with what's waiting and what
