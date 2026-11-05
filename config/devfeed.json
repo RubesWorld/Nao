@@ -1,7 +1,7 @@
 {
   "bind": "100.118.35.80",
   "port": 8300,
-  "hosts": ["rubens-mac-mini", "rubens-mac-mini.tailf3e698.ts.net"],
+  "hosts": ["mini", "mini.tailf3e698.ts.net", "rubens-mac-mini", "rubens-mac-mini.tailf3e698.ts.net"],
   "days": 30,
   "spark_days": 14,
   "owner": "RubesWorld",
